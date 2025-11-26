@@ -114,4 +114,3 @@ declare module "@opentui/react" {
 extend({ "terminal-buffer": TerminalBufferRenderable })
 
 // Export to prevent tree-shaking of side-effect registration
-export { TerminalBufferRenderable, terminalDataToStyledText }
