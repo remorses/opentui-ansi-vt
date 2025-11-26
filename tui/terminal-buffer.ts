@@ -12,7 +12,6 @@ import { type TerminalData, type TerminalSpan, StyleFlags } from "./ffi"
 const DEFAULT_FG = RGBA.fromHex("#d4d4d4")
 const DEFAULT_BG = RGBA.fromHex("#1e1e1e")
 
-// Text attribute flags from opentui
 const TextAttributes = {
   BOLD: 1 << 0,
   DIM: 1 << 1,
@@ -30,14 +29,12 @@ function convertSpanToChunk(span: TerminalSpan): TextChunk {
   let fgColor = fg ? RGBA.fromHex(fg) : DEFAULT_FG
   let bgColor = bg ? RGBA.fromHex(bg) : undefined
 
-  // Handle inverse
   if (flags & StyleFlags.INVERSE) {
     const temp = fgColor
     fgColor = bgColor || DEFAULT_BG
     bgColor = temp
   }
 
-  // Convert our flags to opentui attributes
   let attributes = 0
   if (flags & StyleFlags.BOLD) attributes |= TextAttributes.BOLD
   if (flags & StyleFlags.ITALIC) attributes |= TextAttributes.ITALIC
@@ -45,23 +42,16 @@ function convertSpanToChunk(span: TerminalSpan): TextChunk {
   if (flags & StyleFlags.STRIKETHROUGH) attributes |= TextAttributes.STRIKETHROUGH
   if (flags & StyleFlags.FAINT) attributes |= TextAttributes.DIM
 
-  return {
-    __isChunk: true,
-    text,
-    fg: fgColor,
-    bg: bgColor,
-    attributes,
-  }
+  return { __isChunk: true, text, fg: fgColor, bg: bgColor, attributes }
 }
 
-function terminalDataToStyledText(data: TerminalData): StyledText {
+export function terminalDataToStyledText(data: TerminalData): StyledText {
   const chunks: TextChunk[] = []
 
   for (let i = 0; i < data.lines.length; i++) {
     const line = data.lines[i]
 
     if (line.spans.length === 0) {
-      // Empty line
       chunks.push({ __isChunk: true, text: " ", attributes: 0 })
     } else {
       for (const span of line.spans) {
@@ -69,7 +59,6 @@ function terminalDataToStyledText(data: TerminalData): StyledText {
       }
     }
 
-    // Add newline after each line except the last
     if (i < data.lines.length - 1) {
       chunks.push({ __isChunk: true, text: "\n", attributes: 0 })
     }
