@@ -155,6 +155,31 @@ The `getScrollPositionForLine(lineNumber)` method:
 - Returns the actual scrollTop position accounting for text wrapping and layout
 - Clamps out-of-bounds values automatically
 
+#### Limiting Output for Performance
+
+For large log files, use the `limit` parameter to only render the first N lines. **Limiting happens at the Zig level** before JSON serialization, making it extremely efficient:
+
+```tsx
+// Only render first 100 lines of a huge log file
+<terminal-buffer 
+  ansi={hugeLogFile} 
+  cols={120} 
+  rows={10}
+  limit={100}  // Limits at Zig level (before JSON parsing!)
+/>
+
+// Quick preview: just show first 10 lines
+<terminal-buffer 
+  ansi={longOutput} 
+  limit={10}
+/>
+```
+
+Benefits of using `limit`:
+- **Maximum performance** - Limits at native Zig level before JSON serialization
+- **Lower memory** - Doesn't process or allocate memory for skipped lines
+- **Instant preview** - Show first N lines of massive logs without waiting
+
 ### API
 
 #### Main Export
@@ -215,6 +240,7 @@ interface TerminalBufferOptions {
   ansi: string | Buffer  // Raw ANSI input
   cols?: number          // Terminal width (default: 120)
   rows?: number          // Terminal height (default: 40)
+  limit?: number         // Max lines to render (from start)
 }
 
 // StyleFlags: bold=1, italic=2, underline=4, strikethrough=8, inverse=16, faint=32
