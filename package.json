@@ -4,9 +4,10 @@
   "description": "Convert raw PTY log files to JSON using Ghostty's terminal emulation library",
   "type": "module",
   "scripts": {
-    "dev": "vite",
+    "dev": "bun --watch run tui/index.tsx",
     "build": "vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "bun test"
   },
   "keywords": ["terminal", "pty", "vt100", "ansi", "ghostty"],
   "author": "remorses",
