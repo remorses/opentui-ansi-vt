@@ -10,7 +10,86 @@ Fast ANSI/VT terminal parser powered by [Ghostty's](https://github.com/ghostty-o
 - **JSON output** - Compact format with merged spans for rendering
 - **Bun FFI** - Use the Zig library directly from TypeScript
 
-## Quick Start
+## Installation
+
+```bash
+bun add pty-to-json
+```
+
+## Usage
+
+### Basic FFI Usage
+
+```typescript
+import { ptyToJson, type TerminalData } from "pty-to-json"
+
+// Parse ANSI string or buffer
+const data: TerminalData = ptyToJson("\x1b[32mHello\x1b[0m World", {
+  cols: 120,
+  rows: 40,
+})
+
+console.log(data.lines) // Array of lines with styled spans
+console.log(data.cursor) // [col, row] cursor position
+```
+
+### With OpenTUI React
+
+```tsx
+import { ptyToJson } from "pty-to-json"
+import "pty-to-json/terminal-buffer" // Register the <terminal-buffer> component
+
+// Parse your ANSI data
+const data = ptyToJson(ansiContent, { cols: 120, rows: 40 })
+
+// Render in OpenTUI
+function TerminalViewer() {
+  return (
+    <scrollbox focused style={{ flexGrow: 1 }}>
+      <terminal-buffer data={data} />
+    </scrollbox>
+  )
+}
+```
+
+### Terminal Buffer Component
+
+The `<terminal-buffer>` component renders parsed terminal data with full styling support:
+
+```tsx
+import "pty-to-json/terminal-buffer"
+
+<terminal-buffer
+  data={terminalData}  // TerminalData from ptyToJson()
+/>
+```
+
+### TypeScript Types
+
+```typescript
+import type { TerminalData, TerminalLine, TerminalSpan, PtyToJsonOptions } from "pty-to-json"
+
+interface TerminalData {
+  cols: number
+  rows: number
+  cursor: [number, number]
+  offset: number
+  totalLines: number
+  lines: TerminalLine[]
+}
+
+interface TerminalSpan {
+  text: string
+  fg: string | null   // hex color e.g. "#ff5555"
+  bg: string | null
+  flags: number       // StyleFlags bitmask
+  width: number
+}
+
+// StyleFlags: bold=1, italic=2, underline=4, strikethrough=8, inverse=16, faint=32
+```
+
+## Quick Start (Development)
 
 ```bash
 # Setup (installs Zig 0.15.2, clones Ghostty, builds)

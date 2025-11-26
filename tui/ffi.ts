@@ -1,7 +1,37 @@
 import { dlopen, FFIType, ptr, read, suffix, toArrayBuffer } from "bun:ffi"
 import path from "path"
+import fs from "fs"
 
-const libPath = path.join(import.meta.dir, "..", "zig-out", "lib", `libpty-to-json.${suffix}`)
+function getLibPath(): string {
+  // Windows uses .dll without 'lib' prefix
+  const libName = process.platform === "win32" ? `pty-to-json.${suffix}` : `libpty-to-json.${suffix}`
+
+  // Check local development path first (zig-out)
+  const devPath = path.join(import.meta.dir, "..", "zig-out", "lib", libName)
+  if (fs.existsSync(devPath)) {
+    return devPath
+  }
+
+  // Check npm package dist paths
+  const platformMap: Record<string, string> = {
+    darwin: "darwin-arm64",
+    linux: "linux-x64",
+    win32: "win32-x64",
+  }
+  const platform = platformMap[process.platform] || "linux-x64"
+  const distPath = path.join(import.meta.dir, "..", "dist", platform, libName)
+  if (fs.existsSync(distPath)) {
+    return distPath
+  }
+
+  throw new Error(
+    `Could not find native library ${libName}. ` +
+      `Looked in:\n  - ${devPath}\n  - ${distPath}\n` +
+      `Make sure to run 'zig build' or install the package with binaries.`
+  )
+}
+
+const libPath = getLibPath()
 
 const lib = dlopen(libPath, {
   ptyToJson: {

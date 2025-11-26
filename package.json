@@ -3,15 +3,47 @@
   "version": "1.0.0",
   "description": "Convert raw PTY log files to JSON using Ghostty's terminal emulation library",
   "type": "module",
+  "main": "./tui/ffi.ts",
+  "exports": {
+    ".": {
+      "import": "./tui/ffi.ts",
+      "types": "./tui/ffi.ts"
+    },
+    "./terminal-buffer": {
+      "import": "./tui/terminal-buffer.ts",
+      "types": "./tui/terminal-buffer.ts"
+    }
+  },
+  "files": [
+    "tui/ffi.ts",
+    "tui/terminal-buffer.ts",
+    "dist/**/*"
+  ],
   "scripts": {
     "dev": "bun --watch run tui/index.tsx",
     "build": "vite build",
     "preview": "vite preview",
     "test": "bun test"
   },
-  "keywords": ["terminal", "pty", "vt100", "ansi", "ghostty"],
+  "keywords": ["terminal", "pty", "vt100", "ansi", "ghostty", "opentui"],
   "author": "remorses",
   "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/remorses/opentui-ansi-vt"
+  },
+  "peerDependencies": {
+    "@opentui/core": "*",
+    "@opentui/react": "*"
+  },
+  "peerDependenciesMeta": {
+    "@opentui/core": {
+      "optional": true
+    },
+    "@opentui/react": {
+      "optional": true
+    }
+  },
   "devDependencies": {
     "vite": "^7.2.4"
   }
