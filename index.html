@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Terminal JSON Viewer</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, sans-serif;
+      background: #0d1117;
+      color: #c9d1d9;
+      padding: 20px;
+    }
+    h1 { margin-bottom: 20px; font-size: 1.5em; }
+    .controls {
+      margin-bottom: 20px;
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+    input[type="file"] { display: none; }
+    label, button {
+      background: #21262d;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      padding: 8px 16px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+    }
+    label:hover, button:hover { background: #30363d; }
+    textarea {
+      width: 100%;
+      height: 150px;
+      background: #161b22;
+      border: 1px solid #30363d;
+      color: #c9d1d9;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 10px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+      resize: vertical;
+    }
+    #terminal {
+      background: #1e1e1e;
+      border-radius: 8px;
+      padding: 16px;
+      overflow-x: auto;
+      font-family: 'SF Mono', 'Menlo', 'Monaco', 'Courier New', monospace;
+      font-size: 14px;
+      line-height: 1.4;
+    }
+    .line { white-space: pre; min-height: 1.4em; }
+    .span { display: inline; }
+    .bold { font-weight: bold; }
+    .italic { font-style: italic; }
+    .underline { text-decoration: underline; }
+    .strikethrough { text-decoration: line-through; }
+    .faint { opacity: 0.5; }
+    .info {
+      margin-top: 20px;
+      font-size: 12px;
+      color: #8b949e;
+    }
+  </style>
+</head>
+<body>
+  <h1>Terminal JSON Viewer</h1>
+  
+  <div class="controls">
+    <label for="file-input">Load JSON File</label>
+    <input type="file" id="file-input" accept=".json">
+    <button onclick="loadSessionJson()">Load session.json</button>
+    <button onclick="loadSample()">Load Sample</button>
+    <button onclick="renderFromTextarea()">Render from Text</button>
+  </div>
+  
+  <textarea id="json-input" placeholder="Paste JSON here or load a file..."></textarea>
+  
+  <div id="terminal"></div>
+  
+  <div class="info">
+    <div id="info-text">No data loaded</div>
+  </div>
+
+  <script>
+    const defaultFg = '#d4d4d4';
+    const defaultBg = '#1e1e1e';
+    
+    // Flag constants
+    const BOLD = 1;
+    const ITALIC = 2;
+    const UNDERLINE = 4;
+    const STRIKETHROUGH = 8;
+    const INVERSE = 16;
+    const FAINT = 32;
+    
+    function render(data) {
+      const terminal = document.getElementById('terminal');
+      terminal.innerHTML = '';
+      
+      const { cols, rows, cursor, lines } = data;
+      
+      lines.forEach((line, lineIdx) => {
+        const lineDiv = document.createElement('div');
+        lineDiv.className = 'line';
+        
+        if (line.length === 0) {
+          lineDiv.innerHTML = '&nbsp;';
+        } else {
+          line.forEach(span => {
+            const [text, fg, bg, flags, width] = span;
+            const spanEl = document.createElement('span');
+            spanEl.className = 'span';
+            spanEl.textContent = text;
+            
+            // Apply colors
+            let fgColor = fg || defaultFg;
+            let bgColor = bg;
+            
+            // Handle inverse
+            if (flags & INVERSE) {
+              [fgColor, bgColor] = [bgColor || defaultBg, fgColor];
+            }
+            
+            spanEl.style.color = fgColor;
+            if (bgColor) spanEl.style.backgroundColor = bgColor;
+            
+            // Apply flags
+            if (flags & BOLD) spanEl.classList.add('bold');
+            if (flags & ITALIC) spanEl.classList.add('italic');
+            if (flags & UNDERLINE) spanEl.classList.add('underline');
+            if (flags & STRIKETHROUGH) spanEl.classList.add('strikethrough');
+            if (flags & FAINT) spanEl.classList.add('faint');
+            
+            lineDiv.appendChild(spanEl);
+          });
+        }
+        
+        terminal.appendChild(lineDiv);
+      });
+      
+      // Update info
+      const totalSpans = lines.reduce((acc, line) => acc + line.length, 0);
+      document.getElementById('info-text').textContent = 
+        `${cols}x${rows} | Cursor: (${cursor[0]}, ${cursor[1]}) | ${lines.length} lines | ${totalSpans} spans`;
+    }
+    
+    function renderFromTextarea() {
+      const textarea = document.getElementById('json-input');
+      try {
+        const data = JSON.parse(textarea.value);
+        render(data);
+      } catch (e) {
+        alert('Invalid JSON: ' + e.message);
+      }
+    }
+    
+    document.getElementById('file-input').addEventListener('change', (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const textarea = document.getElementById('json-input');
+        textarea.value = e.target.result;
+        renderFromTextarea();
+      };
+      reader.readAsText(file);
+    });
+    
+    async function loadSessionJson() {
+      try {
+        const res = await fetch('/testdata/session.json');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('json-input').value = JSON.stringify(data, null, 2);
+          render(data);
+        } else {
+          alert('session.json not found. Run: ./zig-out/bin/pty-to-json testdata/session.log -o testdata/session.json');
+        }
+      } catch (e) {
+        alert('Failed to load session.json: ' + e.message);
+      }
+    }
+    
+    function loadSample() {
+      const sample = {
+        "cols": 80,
+        "rows": 24,
+        "cursor": [0, 3],
+        "lines": [
+          [["$ ", "#00ff00", null, 1, 2], ["ls -la", "#d4d4d4", null, 0, 6]],
+          [["total 188", "#d4d4d4", null, 0, 9]],
+          [["drwxr-xr-x", "#d4d4d4", null, 0, 10], [" 15 user user ", "#d4d4d4", null, 0, 14], ["Documents", "#81a2be", null, 1, 9]],
+          [["drwxr-xr-x", "#d4d4d4", null, 0, 10], ["  8 user user ", "#d4d4d4", null, 0, 14], ["Downloads", "#81a2be", null, 1, 9]],
+          [["-rw-r--r--", "#d4d4d4", null, 0, 10], ["  1 user user ", "#d4d4d4", null, 0, 14], ["README.md", "#d4d4d4", null, 0, 9]],
+          [["-rwxr-xr-x", "#d4d4d4", null, 0, 10], ["  1 user user ", "#d4d4d4", null, 0, 14], ["script.sh", "#00ff00", null, 1, 9]],
+          [],
+          [["$ ", "#00ff00", null, 1, 2], ["echo ", "#d4d4d4", null, 0, 5], ["\"Hello World\"", "#f1fa8c", null, 0, 13]],
+          [["Hello World", "#d4d4d4", null, 0, 11]],
+          [],
+          [["$ ", "#00ff00", null, 1, 2]]
+        ]
+      };
+      document.getElementById('json-input').value = JSON.stringify(sample, null, 2);
+      render(sample);
+    }
+    
+    // Try to load session.json on start, otherwise load sample
+    async function init() {
+      // Check URL params for file
+      const params = new URLSearchParams(window.location.search);
+      const fileParam = params.get('file');
+      
+      if (fileParam) {
+        try {
+          const res = await fetch(fileParam);
+          const data = await res.json();
+          document.getElementById('json-input').value = JSON.stringify(data, null, 2);
+          render(data);
+          return;
+        } catch (e) {
+          console.warn('Failed to load file from URL param:', e);
+        }
+      }
+      
+      // Try to load testdata/session.json
+      try {
+        const res = await fetch('/testdata/session.json');
+        if (res.ok) {
+          const data = await res.json();
+          document.getElementById('json-input').value = JSON.stringify(data, null, 2);
+          render(data);
+          return;
+        }
+      } catch (e) {
+        console.warn('No session.json found, loading sample');
+      }
+      
+      loadSample();
+    }
+    
+    init();
+  </script>
+</body>
+</html>

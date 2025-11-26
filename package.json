@@ -1,0 +1,17 @@
+{
+  "name": "pty-to-json",
+  "version": "1.0.0",
+  "description": "Convert raw PTY log files to JSON using Ghostty's terminal emulation library",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": ["terminal", "pty", "vt100", "ansi", "ghostty"],
+  "author": "remorses",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^7.2.4"
+  }
+}

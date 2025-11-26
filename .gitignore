@@ -1,0 +1,9 @@
+# Zig build artifacts
+.zig-cache/
+zig-out/
+
+# Node.js
+node_modules/
+
+# Generated files
+testdata/*.json

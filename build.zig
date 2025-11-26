@@ -24,7 +24,7 @@ pub fn build(b: *std.Build) void {
     }
 
     const exe = b.addExecutable(.{
-        .name = "pty-to-html",
+        .name = "pty-to-json",
         .root_module = exe_mod,
     });
     b.installArtifact(exe);
