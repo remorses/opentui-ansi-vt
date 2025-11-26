@@ -24,7 +24,7 @@ jobs:
       - name: Setup Zig
         uses: mlugg/setup-zig@v1
         with:
-          version: 0.15.0
+          version: 0.15.2
 
       - name: Build
         run: zig build -Doptimize=ReleaseFast
