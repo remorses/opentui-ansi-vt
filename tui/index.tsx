@@ -5,10 +5,6 @@ import "./terminal-buffer" // Register the custom component
 
 const DEFAULT_BG = "#1e1e1e"
 
-// Old React-based view (slow for large files)
-export { TerminalViewReact } from "./terminal-view-react"
-
-// New native buffer view (fast)
 export function TerminalView({ data }: { data: TerminalData }) {
   return (
     <box style={{ flexDirection: "column", flexGrow: 1 }}>
@@ -157,7 +153,7 @@ if (import.meta.main) {
     input = SAMPLE_ANSI
   }
 
-  const data = ptyToJson(input, { cols: 120, rows: 10000 })
+  const data = ptyToJson(input, { cols: 120, rows: 120 })
 
   const renderer = await createCliRenderer({ exitOnCtrlC: true })
   createRoot(renderer).render(<App data={data} />)

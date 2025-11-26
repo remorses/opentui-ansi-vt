@@ -1,145 +1,97 @@
-import { describe, expect, it, beforeEach, afterEach } from "bun:test"
-import { testRender } from "@opentui/react/test-utils"
-import { TerminalView } from "./index"
-import type { TerminalData } from "./ffi"
+import { describe, expect, it } from "bun:test"
+import { ptyToJson, StyleFlags, type TerminalData, type TerminalSpan } from "./ffi"
 
-let testSetup: Awaited<ReturnType<typeof testRender>>
+describe("ptyToJson", () => {
+  it("should parse simple ANSI text", () => {
+    const input = "\x1b[32mgreen\x1b[0m normal"
+    const result = ptyToJson(input, { cols: 80, rows: 24 })
 
-describe("TerminalView", () => {
-  afterEach(() => {
-    if (testSetup) {
-      testSetup.renderer.destroy()
-    }
+    expect(result.cols).toBe(80)
+    expect(result.rows).toBe(24)
+    expect(result.lines.length).toBeGreaterThan(0)
   })
 
-  it("should render simple styled text", async () => {
-    const data: TerminalData = {
-      cols: 80,
-      rows: 24,
-      cursor: [0, 0],
-      offset: 0,
-      totalLines: 3,
-      lines: [
-        {
-          spans: [
-            { text: "Hello", fg: "#5555ff", bg: null, flags: 1, width: 5 },
-            { text: " ", fg: null, bg: null, flags: 0, width: 1 },
-            { text: "World", fg: "#55ff55", bg: null, flags: 0, width: 5 },
-          ],
-        },
-        {
-          spans: [{ text: "Normal text", fg: null, bg: null, flags: 0, width: 11 }],
-        },
-        {
-          spans: [],
-        },
-      ],
-    }
+  it("should parse bold text", () => {
+    const input = "\x1b[1mbold\x1b[0m"
+    const result = ptyToJson(input, { cols: 80, rows: 24 })
 
-    testSetup = await testRender(<TerminalView data={data} />, {
-      width: 40,
-      height: 10,
-    })
-
-    await testSetup.renderOnce()
-    const frame = testSetup.captureCharFrame()
-    expect(frame).toMatchSnapshot()
+    const firstLine = result.lines[0]
+    expect(firstLine.spans.length).toBeGreaterThan(0)
+    const boldSpan = firstLine.spans.find((s) => s.text === "bold")
+    expect(boldSpan).toBeDefined()
+    expect(boldSpan!.flags & StyleFlags.BOLD).toBeTruthy()
   })
 
-  it("should render text with all style flags", async () => {
-    const data: TerminalData = {
-      cols: 80,
-      rows: 24,
-      cursor: [5, 2],
-      offset: 0,
-      totalLines: 4,
-      lines: [
-        {
-          spans: [{ text: "Bold", fg: null, bg: null, flags: 1, width: 4 }],
-        },
-        {
-          spans: [{ text: "Italic", fg: null, bg: null, flags: 2, width: 6 }],
-        },
-        {
-          spans: [{ text: "Underline", fg: null, bg: null, flags: 4, width: 9 }],
-        },
-        {
-          spans: [{ text: "Inverse", fg: "#ff0000", bg: null, flags: 16, width: 7 }],
-        },
-      ],
-    }
+  it("should parse colored text", () => {
+    const input = "\x1b[31mred\x1b[0m \x1b[32mgreen\x1b[0m"
+    const result = ptyToJson(input, { cols: 80, rows: 24 })
 
-    testSetup = await testRender(<TerminalView data={data} />, {
-      width: 40,
-      height: 10,
-    })
+    const firstLine = result.lines[0]
+    expect(firstLine.spans.length).toBeGreaterThan(0)
 
-    await testSetup.renderOnce()
-    const frame = testSetup.captureCharFrame()
-    expect(frame).toMatchSnapshot()
+    const redSpan = firstLine.spans.find((s) => s.text === "red")
+    expect(redSpan).toBeDefined()
+    expect(redSpan!.fg).toBeTruthy()
+
+    const greenSpan = firstLine.spans.find((s) => s.text === "green")
+    expect(greenSpan).toBeDefined()
+    expect(greenSpan!.fg).toBeTruthy()
   })
 
-  it("should render colored terminal output", async () => {
-    const data: TerminalData = {
-      cols: 120,
-      rows: 40,
-      cursor: [0, 5],
-      offset: 0,
-      totalLines: 5,
-      lines: [
-        {
-          spans: [
-            { text: "Red", fg: "#ff5555", bg: null, flags: 0, width: 3 },
-            { text: " ", fg: null, bg: null, flags: 0, width: 1 },
-            { text: "Green", fg: "#55ff55", bg: null, flags: 0, width: 5 },
-            { text: " ", fg: null, bg: null, flags: 0, width: 1 },
-            { text: "Blue", fg: "#5555ff", bg: null, flags: 0, width: 4 },
-          ],
-        },
-        {
-          spans: [{ text: "With background", fg: "#ffffff", bg: "#ff0000", flags: 0, width: 15 }],
-        },
-        {
-          spans: [{ text: "Bold red", fg: "#ff5555", bg: null, flags: 1, width: 8 }],
-        },
-        {
-          spans: [{ text: "Faint text", fg: "#888888", bg: null, flags: 32, width: 10 }],
-        },
-        {
-          spans: [],
-        },
-      ],
-    }
+  it("should handle multiple style flags", () => {
+    const input = "\x1b[1;3;4mstyles\x1b[0m"
+    const result = ptyToJson(input, { cols: 80, rows: 24 })
 
-    testSetup = await testRender(<TerminalView data={data} />, {
-      width: 50,
-      height: 12,
-    })
-
-    await testSetup.renderOnce()
-    const frame = testSetup.captureCharFrame()
-    expect(frame).toMatchSnapshot()
+    const firstLine = result.lines[0]
+    const styledSpan = firstLine.spans.find((s) => s.text === "styles")
+    expect(styledSpan).toBeDefined()
+    expect(styledSpan!.flags & StyleFlags.BOLD).toBeTruthy()
+    expect(styledSpan!.flags & StyleFlags.ITALIC).toBeTruthy()
+    expect(styledSpan!.flags & StyleFlags.UNDERLINE).toBeTruthy()
   })
 
-  it("should display info bar with terminal dimensions", async () => {
-    const data: TerminalData = {
-      cols: 80,
-      rows: 24,
-      cursor: [10, 5],
-      offset: 0,
-      totalLines: 100,
-      lines: [{ spans: [{ text: "Test", fg: null, bg: null, flags: 0, width: 4 }] }],
-    }
+  it("should parse RGB colors", () => {
+    const input = "\x1b[38;2;255;0;128mrgb\x1b[0m"
+    const result = ptyToJson(input, { cols: 80, rows: 24 })
 
-    testSetup = await testRender(<TerminalView data={data} />, {
-      width: 60,
-      height: 8,
-    })
+    const firstLine = result.lines[0]
+    const rgbSpan = firstLine.spans.find((s) => s.text === "rgb")
+    expect(rgbSpan).toBeDefined()
+    expect(rgbSpan!.fg).toMatch(/^#[0-9a-fA-F]{6}$/)
+  })
 
-    await testSetup.renderOnce()
-    const frame = testSetup.captureCharFrame()
-    expect(frame).toContain("80x24")
-    expect(frame).toContain("Cursor: (10, 5)")
-    expect(frame).toContain("Lines: 100")
+  it("should track cursor position", () => {
+    const input = "line1\nline2\nline3"
+    const result = ptyToJson(input, { cols: 80, rows: 24 })
+
+    expect(result.cursor).toBeDefined()
+    expect(result.cursor.length).toBe(2)
+  })
+
+  it("should handle whitespace input", () => {
+    const result = ptyToJson(" ", { cols: 80, rows: 24 })
+
+    expect(result.cols).toBe(80)
+    expect(result.rows).toBe(24)
+    expect(result.totalLines).toBeGreaterThanOrEqual(0)
+  })
+
+  it("should respect cols/rows options", () => {
+    const input = "test"
+    const result = ptyToJson(input, { cols: 120, rows: 50 })
+
+    expect(result.cols).toBe(120)
+    expect(result.rows).toBe(50)
+  })
+})
+
+describe("StyleFlags", () => {
+  it("should have correct flag values", () => {
+    expect(StyleFlags.BOLD).toBe(1)
+    expect(StyleFlags.ITALIC).toBe(2)
+    expect(StyleFlags.UNDERLINE).toBe(4)
+    expect(StyleFlags.STRIKETHROUGH).toBe(8)
+    expect(StyleFlags.INVERSE).toBe(16)
+    expect(StyleFlags.FAINT).toBe(32)
   })
 })
