@@ -52,6 +52,37 @@ function TerminalViewer() {
 }
 ```
 
+### Full Example
+
+```tsx
+import { createCliRenderer } from "@opentui/core"
+import { createRoot, useKeyboard } from "@opentui/react"
+import { ptyToJson } from "opentui-ansi-vt"
+import "opentui-ansi-vt/terminal-buffer"
+
+const ANSI = `\x1b[1;32muser@host\x1b[0m:\x1b[1;34m~/app\x1b[0m$ ls
+\x1b[1;34msrc\x1b[0m  package.json  \x1b[1;32mbuild.sh\x1b[0m
+\x1b[31mRed\x1b[0m \x1b[32mGreen\x1b[0m \x1b[33mYellow\x1b[0m \x1b[34mBlue\x1b[0m
+`
+
+function App() {
+  useKeyboard((key) => {
+    if (key.name === "q") process.exit(0)
+  })
+
+  const data = ptyToJson(ANSI, { cols: 80, rows: 24 })
+
+  return (
+    <scrollbox focused style={{ flexGrow: 1 }}>
+      <terminal-buffer data={data} />
+    </scrollbox>
+  )
+}
+
+const renderer = await createCliRenderer({ exitOnCtrlC: true })
+createRoot(renderer).render(<App />)
+```
+
 ### Terminal Buffer Component
 
 The `<terminal-buffer>` component renders parsed terminal data with full styling support:
