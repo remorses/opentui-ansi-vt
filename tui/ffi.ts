@@ -1,18 +1,47 @@
 import { dlopen, FFIType, ptr, read, suffix, toArrayBuffer } from "bun:ffi"
 import path from "path"
 import fs from "fs"
+import os from "os"
 
 // Embed native libraries for bun compile (type: "file" embeds them in the binary)
 // @ts-ignore - import attribute for embedding binary files
-import embeddedDylib from "../dist/darwin-arm64/libpty-to-json.dylib" with { type: "file" }
+import embeddedDarwinArm64 from "../dist/darwin-arm64/libpty-to-json.dylib" with { type: "file" }
 // @ts-ignore - import attribute for embedding binary files
-import embeddedSo from "../dist/linux-x64/libpty-to-json.so" with { type: "file" }
+import embeddedDarwinX64 from "../dist/darwin-x64/libpty-to-json.dylib" with { type: "file" }
+// @ts-ignore - import attribute for embedding binary files
+import embeddedLinuxX64 from "../dist/linux-x64/libpty-to-json.so" with { type: "file" }
+// @ts-ignore - import attribute for embedding binary files
+import embeddedLinuxArm64 from "../dist/linux-arm64/libpty-to-json.so" with { type: "file" }
+
+function getPlatformTarget(): string {
+  const platform = process.platform
+  const arch = os.arch()
+
+  if (platform === "darwin") {
+    return arch === "arm64" ? "darwin-arm64" : "darwin-x64"
+  } else if (platform === "linux") {
+    return arch === "arm64" ? "linux-arm64" : "linux-x64"
+  }
+  throw new Error(`Unsupported platform: ${platform}-${arch}`)
+}
+
+function getEmbeddedLib(): string | undefined {
+  const target = getPlatformTarget()
+  const libs: Record<string, string> = {
+    "darwin-arm64": embeddedDarwinArm64,
+    "darwin-x64": embeddedDarwinX64,
+    "linux-x64": embeddedLinuxX64,
+    "linux-arm64": embeddedLinuxArm64,
+  }
+  return libs[target]
+}
 
 function getLibPath(): string {
   const libName = `libpty-to-json.${suffix}`
+  const target = getPlatformTarget()
 
   // Check embedded libraries first (for bun compile)
-  const embedded = process.platform === "darwin" ? embeddedDylib : embeddedSo
+  const embedded = getEmbeddedLib()
   if (embedded && fs.existsSync(embedded)) {
     return embedded
   }
@@ -24,8 +53,7 @@ function getLibPath(): string {
   }
 
   // Check npm package dist paths
-  const platform = process.platform === "darwin" ? "darwin-arm64" : "linux-x64"
-  const distPath = path.join(import.meta.dir, "..", "dist", platform, libName)
+  const distPath = path.join(import.meta.dir, "..", "dist", target, libName)
   if (fs.existsSync(distPath)) {
     return distPath
   }

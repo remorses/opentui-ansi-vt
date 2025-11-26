@@ -18,6 +18,9 @@ jobs:
           - os: macos-latest
             target: darwin-arm64
             lib: libpty-to-json.dylib
+          - os: macos-13
+            target: darwin-x64
+            lib: libpty-to-json.dylib
       fail-fast: true
 
     runs-on: ${{ matrix.os }}
@@ -45,8 +48,32 @@ jobs:
           name: lib-${{ matrix.target }}
           path: zig-out/lib/${{ matrix.lib }}
 
+  # Cross-compile for Linux ARM64
+  build-linux-arm64:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+          fetch-depth: 0
+
+      - name: Setup Zig
+        uses: goto-bus-stop/setup-zig@v2
+        with:
+          version: 0.15.2
+
+      - name: Build for Linux ARM64
+        run: zig build -Doptimize=ReleaseFast -Dtarget=aarch64-linux-gnu
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: lib-linux-arm64
+          path: zig-out/lib/libpty-to-json.so
+
   publish:
-    needs: build
+    needs: [build, build-linux-arm64]
     runs-on: ubuntu-latest
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
 
@@ -59,17 +86,29 @@ jobs:
           node-version: "24"
           registry-url: "https://registry.npmjs.org"
 
-      - name: Download Linux artifact
+      - name: Download Linux x64 artifact
         uses: actions/download-artifact@v4
         with:
           name: lib-linux-x64
           path: dist/linux-x64
 
-      - name: Download macOS artifact
+      - name: Download Linux ARM64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lib-linux-arm64
+          path: dist/linux-arm64
+
+      - name: Download macOS ARM64 artifact
         uses: actions/download-artifact@v4
         with:
           name: lib-darwin-arm64
           path: dist/darwin-arm64
+
+      - name: Download macOS x64 artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: lib-darwin-x64
+          path: dist/darwin-x64
 
       - name: List artifacts
         run: ls -laR dist/

@@ -217,8 +217,10 @@ Options:
 
 | Platform | Status |
 |----------|--------|
-| Linux (x64) | Supported |
-| macOS (ARM64) | Supported |
+| Linux x64 | Supported |
+| Linux ARM64 | Supported |
+| macOS ARM64 (Apple Silicon) | Supported |
+| macOS x64 (Intel) | Supported |
 | Windows | Not supported |
 
 ### Why no Windows?
