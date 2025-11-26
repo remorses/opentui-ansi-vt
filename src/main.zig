@@ -181,41 +181,29 @@ fn writeJsonOutput(
 
         const cells = pin.cells(.all);
 
-        var span_start: usize = 0;
+        // Find last non-null cell to avoid trailing spaces
+        var end_idx: usize = 0;
+        var i: usize = cells.len;
+        while (i > 0) {
+            i -= 1;
+            const cell = &cells[i];
+            if (cell.codepoint() != 0) {
+                end_idx = i + 1;
+                break;
+            }
+        }
+
         var span_len: usize = 0;
         var current_style: ?CellStyle = null;
         var text_len: usize = 0;
         var span_idx: usize = 0;
 
-        for (cells, 0..) |*cell, col_idx| {
+        for (cells[0..end_idx]) |*cell| {
             // Skip spacer cells (wide char continuations)
             if (cell.wide == .spacer_tail) continue;
 
-            const cp = cell.codepoint();
-            
-            // Truly empty cells (codepoint 0) end the current span
-            // but spaces (codepoint 32) are preserved in text
-            const is_null = cp == 0;
-
-            if (is_null) {
-                // Write current span if we have text
-                if (text_len > 0) {
-                    if (span_idx > 0) try writer.writeByte(',');
-                    try writer.writeByte('[');
-                    try writeJsonString(writer, text_buf[0..text_len]);
-                    try writer.writeByte(',');
-                    try writeColor(writer, current_style.?.fg);
-                    try writer.writeByte(',');
-                    try writeColor(writer, current_style.?.bg);
-                    try writer.print(",{},{}", .{ current_style.?.flags.toInt(), span_len });
-                    try writer.writeByte(']');
-                    span_idx += 1;
-                    text_len = 0;
-                    span_len = 0;
-                }
-                current_style = null;
-                continue;
-            }
+            var cp = cell.codepoint();
+            if (cp == 0) cp = 32; // Convert NULL to space
 
             const style = getStyleFromCell(cell, pin, palette);
 
@@ -239,7 +227,6 @@ fn writeJsonOutput(
             }
 
             if (style_changed) {
-                span_start = col_idx;
                 current_style = style;
             }
 
@@ -420,4 +407,64 @@ test "basic JSON output" {
     try testing.expect(std.mem.indexOf(u8, json, "\"cols\":80") != null);
     try testing.expect(std.mem.indexOf(u8, json, "\"totalLines\":") != null);
     try testing.expect(std.mem.indexOf(u8, json, "\"Hello\"") != null);
+}
+
+test "newline handling and wrapping" {
+    const alloc = testing.allocator;
+
+    var t: ghostty_vt.Terminal = try .init(alloc, .{ .cols = 10, .rows = 5 });
+    defer t.deinit(alloc);
+
+    var stream = t.vtStream();
+    defer stream.deinit();
+
+    // Test 1: Staircasing with \n
+    // "123" (cols 0-2) -> \n -> "456" starts at col 3 (staircase)
+    try stream.nextSlice("123\n456");
+
+    var output: std.ArrayList(u8) = .empty;
+    defer output.deinit(alloc);
+
+    try writeJsonOutput(output.writer(alloc), &t, 0, null);
+    const json1 = output.items;
+
+    // "123" should be on first line
+    // "456" should be on second line.
+    // With our fix, NULLs become spaces.
+    // "123" (cols 0-2) -> \n -> "456" starts at col 3.
+    // So line 2 should be "   456" (3 spaces).
+    try testing.expect(std.mem.indexOf(u8, json1, "\"123\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json1, "\"   456\"") != null);
+
+    // Let's verify wrapping instead.
+    t.hardReset();
+    
+    // Test 2: Wrapping
+    // Cols = 10.
+    // "1234567890" (10 chars) -> fills line.
+    // "A" -> wraps to next line.
+    try stream.nextSlice("1234567890A");
+    
+    output.clearRetainingCapacity();
+    try writeJsonOutput(output.writer(alloc), &t, 0, null);
+    const json2 = output.items;
+    
+    // Should have 2 lines with content.
+    // Line 1: "1234567890"
+    // Line 2: "A"
+    try testing.expect(std.mem.indexOf(u8, json2, "\"1234567890\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json2, "\"A\"") != null);
+
+    // Test 3: CRLF avoiding staircase
+    t.hardReset();
+    try stream.nextSlice("123\r\n456");
+    
+    output.clearRetainingCapacity();
+    try writeJsonOutput(output.writer(alloc), &t, 0, null);
+    const json3 = output.items;
+    
+    // Line 1: "123"
+    // Line 2: "456" (at col 0)
+    try testing.expect(std.mem.indexOf(u8, json3, "\"123\"") != null);
+    try testing.expect(std.mem.indexOf(u8, json3, "\"456\"") != null);
 }
