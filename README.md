@@ -318,4 +318,4 @@ bun test                         # run TUI tests
 
 ## License
 
-MIT
+MIT.
