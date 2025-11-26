@@ -180,6 +180,58 @@ Benefits of using `limit`:
 - **Lower memory** - Doesn't process or allocate memory for skipped lines
 - **Instant preview** - Show first N lines of massive logs without waiting
 
+#### Text Highlighting
+
+You can highlight specific regions of text with custom background colors. This is useful for search results, error highlighting, or drawing attention to specific lines.
+
+```tsx
+import { TerminalBufferRenderable, type HighlightRegion } from "opentui-ansi-vt/terminal-buffer"
+
+const highlights: HighlightRegion[] = [
+  { line: 0, start: 0, end: 5, backgroundColor: "#ffff00" },           // Yellow highlight
+  { line: 2, start: 10, end: 20, backgroundColor: "#ff0000" },         // Red highlight
+  { line: 5, start: 0, end: 8, backgroundColor: "#00ff00", replaceWithX: true }, // Mask with 'x'
+]
+
+<terminal-buffer 
+  ansi={ansiString} 
+  cols={80} 
+  rows={24}
+  highlights={highlights}
+/>
+```
+
+**HighlightRegion properties:**
+- `line` - Line number (0-based)
+- `start` - Start column (0-based, inclusive)  
+- `end` - End column (0-based, exclusive)
+- `backgroundColor` - Hex color string like `"#ff0000"`
+- `replaceWithX` - Optional. If `true`, replaces highlighted text with 'x' characters (useful for testing/masking)
+
+**How highlighting works:**
+
+Highlights are applied during the ANSI-to-StyledText conversion. When you set/update highlights on a `TerminalBufferRenderable`, the component re-processes the entire ANSI content to apply the new highlights. This approach:
+
+- Preserves all original text styling (colors, bold, etc.) while adding the highlight background
+- Handles highlights that span multiple styled spans correctly
+- Works efficiently for most use cases
+
+For very large files with frequently changing highlights, consider using `limit` to reduce the rendered content.
+
+**Programmatic usage without the component:**
+
+```typescript
+import { ptyToJson } from "opentui-ansi-vt"
+import { terminalDataToStyledText, type HighlightRegion } from "opentui-ansi-vt/terminal-buffer"
+
+const data = ptyToJson(ansiString, { cols: 80, rows: 24 })
+const highlights: HighlightRegion[] = [
+  { line: 0, start: 0, end: 5, backgroundColor: "#ff0000" }
+]
+const styledText = terminalDataToStyledText(data, highlights)
+// styledText.chunks contains TextChunk[] with highlights applied
+```
+
 ### API
 
 #### Main Export
@@ -216,7 +268,8 @@ import type {
 
 import type { 
   TerminalBufferRenderable,
-  TerminalBufferOptions
+  TerminalBufferOptions,
+  HighlightRegion
 } from "opentui-ansi-vt/terminal-buffer"
 
 interface TerminalData {
@@ -237,10 +290,19 @@ interface TerminalSpan {
 }
 
 interface TerminalBufferOptions {
-  ansi: string | Buffer  // Raw ANSI input
-  cols?: number          // Terminal width (default: 120)
-  rows?: number          // Terminal height (default: 40)
-  limit?: number         // Max lines to render (from start)
+  ansi: string | Buffer       // Raw ANSI input
+  cols?: number               // Terminal width (default: 120)
+  rows?: number               // Terminal height (default: 40)
+  limit?: number              // Max lines to render (from start)
+  highlights?: HighlightRegion[]  // Regions to highlight
+}
+
+interface HighlightRegion {
+  line: number           // Line number (0-based)
+  start: number          // Start column (0-based, inclusive)
+  end: number            // End column (0-based, exclusive)
+  backgroundColor: string // Hex color like "#ff0000"
+  replaceWithX?: boolean // Replace text with 'x' (for testing)
 }
 
 // StyleFlags: bold=1, italic=2, underline=4, strikethrough=8, inverse=16, faint=32

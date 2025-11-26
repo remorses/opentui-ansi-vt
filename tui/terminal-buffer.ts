@@ -10,6 +10,22 @@ import { ptyToJson, type TerminalData, type TerminalSpan, StyleFlags } from "./f
 
 const DEFAULT_FG = RGBA.fromHex("#d4d4d4")
 
+/**
+ * Defines a region to highlight in the terminal output.
+ */
+export interface HighlightRegion {
+  /** Line number (0-based) */
+  line: number
+  /** Start column (0-based, inclusive) */
+  start: number
+  /** End column (0-based, exclusive) */
+  end: number
+  /** If true, replaces the highlighted text with 'x' characters (for testing) */
+  replaceWithX?: boolean
+  /** Background color for the highlight (hex string like "#ff0000") */
+  backgroundColor: string
+}
+
 const TextAttributes = {
   BOLD: 1 << 0,
   DIM: 1 << 1,
@@ -43,19 +59,125 @@ function convertSpanToChunk(span: TerminalSpan): TextChunk {
   return { __isChunk: true, text, fg: fgColor, bg: bgColor, attributes }
 }
 
-export function terminalDataToStyledText(data: TerminalData): StyledText {
+/**
+ * Applies highlights to chunks for a specific line.
+ * Splits chunks at highlight boundaries and applies background colors.
+ */
+export function applyHighlightsToLine(
+  chunks: TextChunk[],
+  highlights: HighlightRegion[],
+): TextChunk[] {
+  if (highlights.length === 0) return chunks
+
+  const result: TextChunk[] = []
+  let col = 0
+
+  for (const chunk of chunks) {
+    const chunkStart = col
+    const chunkEnd = col + chunk.text.length
+
+    // Find all highlights that overlap with this chunk
+    const overlappingHighlights = highlights.filter(
+      (hl) => hl.start < chunkEnd && hl.end > chunkStart
+    )
+
+    if (overlappingHighlights.length === 0) {
+      // No highlights overlap this chunk
+      result.push(chunk)
+      col = chunkEnd
+      continue
+    }
+
+    // Process the chunk with highlights
+    let pos = 0
+    const text = chunk.text
+
+    // Sort highlights by start position
+    const sortedHighlights = [...overlappingHighlights].sort((a, b) => a.start - b.start)
+
+    for (const hl of sortedHighlights) {
+      const hlStartInChunk = Math.max(0, hl.start - chunkStart)
+      const hlEndInChunk = Math.min(text.length, hl.end - chunkStart)
+
+      // Add text before highlight (if any)
+      if (pos < hlStartInChunk) {
+        result.push({
+          __isChunk: true,
+          text: text.slice(pos, hlStartInChunk),
+          fg: chunk.fg,
+          bg: chunk.bg,
+          attributes: chunk.attributes,
+        })
+      }
+
+      // Add highlighted text
+      if (hlStartInChunk < hlEndInChunk) {
+        const highlightedText = text.slice(hlStartInChunk, hlEndInChunk)
+        const displayText = hl.replaceWithX ? "x".repeat(highlightedText.length) : highlightedText
+        result.push({
+          __isChunk: true,
+          text: displayText,
+          fg: chunk.fg,
+          bg: RGBA.fromHex(hl.backgroundColor),
+          attributes: chunk.attributes,
+        })
+      }
+
+      pos = hlEndInChunk
+    }
+
+    // Add remaining text after last highlight
+    if (pos < text.length) {
+      result.push({
+        __isChunk: true,
+        text: text.slice(pos),
+        fg: chunk.fg,
+        bg: chunk.bg,
+        attributes: chunk.attributes,
+      })
+    }
+
+    col = chunkEnd
+  }
+
+  return result
+}
+
+export function terminalDataToStyledText(
+  data: TerminalData,
+  highlights?: HighlightRegion[],
+): StyledText {
   const chunks: TextChunk[] = []
+
+  // Group highlights by line for efficient lookup
+  const highlightsByLine = new Map<number, HighlightRegion[]>()
+  if (highlights) {
+    for (const hl of highlights) {
+      const lineHighlights = highlightsByLine.get(hl.line) ?? []
+      lineHighlights.push(hl)
+      highlightsByLine.set(hl.line, lineHighlights)
+    }
+  }
 
   for (let i = 0; i < data.lines.length; i++) {
     const line = data.lines[i]
+    let lineChunks: TextChunk[] = []
 
     if (line.spans.length === 0) {
-      chunks.push({ __isChunk: true, text: " ", attributes: 0 })
+      lineChunks.push({ __isChunk: true, text: " ", attributes: 0 })
     } else {
       for (const span of line.spans) {
-        chunks.push(convertSpanToChunk(span))
+        lineChunks.push(convertSpanToChunk(span))
       }
     }
+
+    // Apply highlights for this line
+    const lineHighlights = highlightsByLine.get(i)
+    if (lineHighlights) {
+      lineChunks = applyHighlightsToLine(lineChunks, lineHighlights)
+    }
+
+    chunks.push(...lineChunks)
 
     if (i < data.lines.length - 1) {
       chunks.push({ __isChunk: true, text: "\n", attributes: 0 })
@@ -70,6 +192,7 @@ export interface TerminalBufferOptions extends TextBufferOptions {
   cols?: number
   rows?: number
   limit?: number  // Maximum number of lines to render (from start)
+  highlights?: HighlightRegion[]  // Regions to highlight with custom background colors
 }
 
 export class TerminalBufferRenderable extends TextBufferRenderable {
@@ -77,6 +200,7 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
   private _cols: number
   private _rows: number
   private _limit?: number
+  private _highlights?: HighlightRegion[]
   private _ansiDirty: boolean = false
   private _lineCount: number = 0
 
@@ -91,6 +215,7 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
     this._cols = options.cols ?? 120
     this._rows = options.rows ?? 40
     this._limit = options.limit
+    this._highlights = options.highlights
     this._ansiDirty = true
   }
 
@@ -111,6 +236,16 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
       this._ansiDirty = true
       this.requestRender()
     }
+  }
+
+  get highlights(): HighlightRegion[] | undefined {
+    return this._highlights
+  }
+
+  set highlights(value: HighlightRegion[] | undefined) {
+    this._highlights = value
+    this._ansiDirty = true
+    this.requestRender()
   }
 
   get ansi(): string | Buffer {
@@ -157,7 +292,7 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
         rows: this._rows,
         limit: this._limit 
       })
-      const styledText = terminalDataToStyledText(data)
+      const styledText = terminalDataToStyledText(data, this._highlights)
       this.textBuffer.setStyledText(styledText)
       this.updateTextInfo()
       

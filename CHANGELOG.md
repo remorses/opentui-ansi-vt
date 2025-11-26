@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.3
+
+### Features
+
+- **terminal-buffer**: Add text highlighting support
+  - New `HighlightRegion` interface for specifying highlight regions with `line`, `start`, `end`, `backgroundColor`
+  - `replaceWithX` option to mask highlighted text with 'x' characters (useful for testing)
+  - `applyHighlightsToLine` function to apply highlights to text chunks
+  - `terminalDataToStyledText` now accepts optional `highlights` parameter
+  - `TerminalBufferRenderable` now accepts `highlights` option in constructor and as a property
+
 ## 1.2.2
 
 ### Bug Fixes
