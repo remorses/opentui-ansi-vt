@@ -192,14 +192,13 @@ fn writeJsonOutput(
             if (cell.wide == .spacer_tail) continue;
 
             const cp = cell.codepoint();
-            const style = getStyleFromCell(cell, pin, palette);
+            
+            // Truly empty cells (codepoint 0) end the current span
+            // but spaces (codepoint 32) are preserved in text
+            const is_null = cp == 0;
 
-            // Check if we need to start a new span
-            const style_changed = if (current_style) |cs| !cs.eql(style) else true;
-            const is_empty = cp == 0 or cp == ' ';
-
-            if (style_changed or (is_empty and text_len > 0)) {
-                // Write previous span if we have text
+            if (is_null) {
+                // Write current span if we have text
                 if (text_len > 0) {
                     if (span_idx > 0) try writer.writeByte(',');
                     try writer.writeByte('[');
@@ -211,29 +210,45 @@ fn writeJsonOutput(
                     try writer.print(",{},{}", .{ current_style.?.flags.toInt(), span_len });
                     try writer.writeByte(']');
                     span_idx += 1;
+                    text_len = 0;
+                    span_len = 0;
                 }
-
-                // Reset for new span
-                text_len = 0;
-                span_len = 0;
-                span_start = col_idx;
-                current_style = style;
-            }
-
-            // Skip empty cells entirely (don't add to span)
-            if (is_empty) {
                 current_style = null;
                 continue;
             }
 
-            // Encode codepoint to UTF-8
-            if (cp > 0) {
-                const cp21: u21 = @intCast(cp);
-                const len = std.unicode.utf8CodepointSequenceLength(cp21) catch 1;
-                if (text_len + len <= text_buf.len) {
-                    _ = std.unicode.utf8Encode(cp21, text_buf[text_len..]) catch 0;
-                    text_len += len;
-                }
+            const style = getStyleFromCell(cell, pin, palette);
+
+            // Check if style changed - need to start a new span
+            const style_changed = if (current_style) |cs| !cs.eql(style) else true;
+
+            if (style_changed and text_len > 0) {
+                // Write previous span
+                if (span_idx > 0) try writer.writeByte(',');
+                try writer.writeByte('[');
+                try writeJsonString(writer, text_buf[0..text_len]);
+                try writer.writeByte(',');
+                try writeColor(writer, current_style.?.fg);
+                try writer.writeByte(',');
+                try writeColor(writer, current_style.?.bg);
+                try writer.print(",{},{}", .{ current_style.?.flags.toInt(), span_len });
+                try writer.writeByte(']');
+                span_idx += 1;
+                text_len = 0;
+                span_len = 0;
+            }
+
+            if (style_changed) {
+                span_start = col_idx;
+                current_style = style;
+            }
+
+            // Encode codepoint to UTF-8 (including spaces!)
+            const cp21: u21 = @intCast(cp);
+            const len = std.unicode.utf8CodepointSequenceLength(cp21) catch 1;
+            if (text_len + len <= text_buf.len) {
+                _ = std.unicode.utf8Encode(cp21, text_buf[text_len..]) catch 0;
+                text_len += len;
             }
 
             span_len += if (cell.wide == .wide) 2 else 1;
