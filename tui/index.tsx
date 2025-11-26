@@ -1,5 +1,6 @@
 import { createCliRenderer } from "@opentui/core"
 import { createRoot, useKeyboard, extend } from "@opentui/react"
+import { useState } from "react"
 import { TerminalBufferRenderable } from "./terminal-buffer"
 
 // Register the terminal-buffer component
@@ -19,14 +20,29 @@ export function TerminalView({ ansi }: { ansi: string | Buffer }) {
   )
 }
 
-function App({ ansi }: { ansi: string | Buffer }) {
+function App({ initialAnsi }: { initialAnsi: string | Buffer }) {
+  const [ansi, setAnsi] = useState(initialAnsi)
+  const [count, setCount] = useState(0)
+
   useKeyboard((key) => {
     if (key.name === "q" || key.name === "escape") {
       process.exit(0)
     }
+    if (key.name === "p") {
+      const prefix = `\x1b[1;35m[PREFIX ${count + 1}]\x1b[0m\n`
+      setAnsi(prefix + ansi)
+      setCount(count + 1)
+    }
   })
 
-  return <TerminalView ansi={ansi} />
+  return (
+    <box style={{ flexDirection: "column", flexGrow: 1 }}>
+      <box style={{ height: 1, paddingLeft: 1, marginBottom: 1 }}>
+        <text fg="#8b949e">Press 'p' to add prefix | Press 'q' to quit | Prefix count: {count}</text>
+      </box>
+      <TerminalView ansi={ansi} />
+    </box>
+  )
 }
 
 const SAMPLE_ANSI = `\x1b[1;32muser@hostname\x1b[0m:\x1b[1;34m~/projects/my-app\x1b[0m$ ls -la
@@ -148,5 +164,5 @@ if (import.meta.main) {
   }
 
   const renderer = await createCliRenderer({ exitOnCtrlC: true })
-  createRoot(renderer).render(<App ansi={ansi} />)
+  createRoot(renderer).render(<App initialAnsi={ansi} />)
 }

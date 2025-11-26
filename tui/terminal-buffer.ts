@@ -72,6 +72,10 @@ export interface TerminalBufferOptions extends TextBufferOptions {
 }
 
 export class TerminalBufferRenderable extends TextBufferRenderable {
+  private _ansi: string | Buffer
+  private _cols: number
+  private _rows: number
+
   constructor(ctx: RenderContext, options: TerminalBufferOptions) {
     super(ctx, {
       ...options,
@@ -79,9 +83,47 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
       wrapMode: "none",
     })
 
-    const cols = options.cols ?? 120
-    const rows = options.rows ?? 40
-    const data = ptyToJson(options.ansi, { cols, rows })
+    this._ansi = options.ansi
+    this._cols = options.cols ?? 120
+    this._rows = options.rows ?? 40
+    this.updateBuffer()
+  }
+
+  get ansi(): string | Buffer {
+    return this._ansi
+  }
+
+  set ansi(value: string | Buffer) {
+    if (this._ansi !== value) {
+      this._ansi = value
+      this.updateBuffer()
+    }
+  }
+
+  get cols(): number {
+    return this._cols
+  }
+
+  set cols(value: number) {
+    if (this._cols !== value) {
+      this._cols = value
+      this.updateBuffer()
+    }
+  }
+
+  get rows(): number {
+    return this._rows
+  }
+
+  set rows(value: number) {
+    if (this._rows !== value) {
+      this._rows = value
+      this.updateBuffer()
+    }
+  }
+
+  private updateBuffer(): void {
+    const data = ptyToJson(this._ansi, { cols: this._cols, rows: this._rows })
     const styledText = terminalDataToStyledText(data)
     this.textBuffer.setStyledText(styledText)
     this.updateTextInfo()
