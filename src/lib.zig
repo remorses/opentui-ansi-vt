@@ -248,6 +248,10 @@ export fn ptyToJson(
     var t: ghostty_vt.Terminal = ghostty_vt.Terminal.init(globalArena, .{ .cols = cols, .rows = rows }) catch return null;
     defer t.deinit(globalArena);
 
+    // Enable linefeed mode so LF (\n) also performs carriage return (moves to column 0)
+    // This matches expected behavior when processing text files that use \n for newlines
+    t.modes.set(.linefeed, true);
+
     var stream = t.vtStream();
     defer stream.deinit();
 

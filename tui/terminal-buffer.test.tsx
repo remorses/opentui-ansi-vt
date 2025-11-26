@@ -356,9 +356,9 @@ Line3
       
       expect(outputWithLimit).toBe(`total 224                                                                       
 drwxrwxr-x  27 user  staff   864 Nov 26 19:30 .                                 
-drwx------  71 user  sta                                                        
-ff  2272 Nov 26 19:44 ..                                                        
+drwx------  71 user  staff  2272 Nov 26 19:44 ..                                
 -rw-r--r--   1 user  staff   109 Nov 26 18:15 .gitignore                        
+-rw-r--r--   1 user  staff  1100 Nov 26 19:14 package.json                      
 `)
       // Should be compact
       expect(outputWithLimit.trim().split('\n').length).toBeLessThan(10) 
@@ -382,8 +382,8 @@ ff  2272 Nov 26 19:44 ..
       const output = captureCharFrame()
       expect(output).toBe(`total 224                                                                       
 drwxrwxr-x  27 user  staff   864 Nov 26 19:30 .                                 
-drwx------  71 user  sta                                                        
-ff  2272 Nov 26 19:44 ..                                                        
+drwx------  71 user  staff  2272 Nov 26 19:44 ..                                
+                                                                                
                                                                                 
 `)
     })
