@@ -122,6 +122,39 @@ extend({ "terminal-buffer": TerminalBufferRenderable })
 <terminal-buffer ansi={ansiString} />
 ```
 
+#### Scrolling to Specific Lines
+
+You can scroll to a specific line number in the ANSI output using refs:
+
+```tsx
+import { useRef } from "react"
+import type { ScrollBoxRenderable } from "@opentui/core"
+import type { TerminalBufferRenderable } from "opentui-ansi-vt/terminal-buffer"
+
+function App() {
+  const scrollBoxRef = useRef<ScrollBoxRenderable>(null)
+  const terminalBufferRef = useRef<TerminalBufferRenderable>(null)
+
+  const scrollToLine = (lineNumber: number) => {
+    if (scrollBoxRef.current && terminalBufferRef.current) {
+      const scrollPos = terminalBufferRef.current.getScrollPositionForLine(lineNumber)
+      scrollBoxRef.current.scrollTo(scrollPos)
+    }
+  }
+
+  return (
+    <scrollbox ref={scrollBoxRef}>
+      <terminal-buffer ref={terminalBufferRef} ansi={ansiString} />
+    </scrollbox>
+  )
+}
+```
+
+The `getScrollPositionForLine(lineNumber)` method:
+- Takes a 0-based line number from the ANSI output
+- Returns the actual scrollTop position accounting for text wrapping and layout
+- Clamps out-of-bounds values automatically
+
 ### API
 
 #### Main Export

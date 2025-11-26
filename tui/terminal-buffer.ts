@@ -76,6 +76,7 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
   private _cols: number
   private _rows: number
   private _ansiDirty: boolean = false
+  private _lineCount: number = 0
 
   constructor(ctx: RenderContext, options: TerminalBufferOptions) {
     super(ctx, {
@@ -88,6 +89,13 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
     this._cols = options.cols ?? 120
     this._rows = options.rows ?? 40
     this._ansiDirty = true
+  }
+
+  /**
+   * Returns the total number of lines in the terminal buffer
+   */
+  get lineCount(): number {
+    return this._lineCount
   }
 
   get ansi(): string | Buffer {
@@ -129,11 +137,45 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
   protected renderSelf(buffer: any): void {
     if (this._ansiDirty) {
       const data = ptyToJson(this._ansi, { cols: this._cols, rows: this._rows })
+      this._lineCount = data.lines.length
       const styledText = terminalDataToStyledText(data)
       this.textBuffer.setStyledText(styledText)
       this.updateTextInfo()
       this._ansiDirty = false
     }
     super.renderSelf(buffer)
+  }
+
+  /**
+   * Maps an ANSI line number to the corresponding scrollTop position for a parent ScrollBox.
+   * Uses the actual rendered Y position from the text buffer's line info, which accounts
+   * for text wrapping and actual layout.
+   * 
+   * @param lineNumber - The line number (0-based) in the ANSI output
+   * @returns The scrollTop value to pass to ScrollBox.scrollTo()
+   * 
+   * @example
+   * ```tsx
+   * const scrollPos = terminalBufferRef.current.getScrollPositionForLine(42)
+   * scrollBoxRef.current.scrollTo(scrollPos)
+   * ```
+   */
+  getScrollPositionForLine(lineNumber: number): number {
+    // Clamp to valid range
+    const clampedLine = Math.max(0, Math.min(lineNumber, this._lineCount - 1))
+    
+    // Get the line info which contains actual Y offsets for each line
+    // This accounts for wrapping and actual text layout
+    const lineInfo = this.textBufferView.logicalLineInfo
+    const lineStarts = lineInfo.lineStarts
+    
+    // If we have line start info, use it; otherwise fall back to simple calculation
+    let lineYOffset = clampedLine
+    if (lineStarts && lineStarts.length > clampedLine) {
+      lineYOffset = lineStarts[clampedLine]
+    }
+    
+    // Return the absolute Y position: this renderable's Y + the line's offset within it
+    return this.y + lineYOffset
   }
 }

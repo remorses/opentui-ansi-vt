@@ -1,6 +1,6 @@
-import { createCliRenderer } from "@opentui/core"
+import { createCliRenderer, type ScrollBoxRenderable } from "@opentui/core"
 import { createRoot, useKeyboard, extend } from "@opentui/react"
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { TerminalBufferRenderable } from "./terminal-buffer"
 
 // Register the terminal-buffer component
@@ -23,6 +23,8 @@ export function TerminalView({ ansi }: { ansi: string | Buffer }) {
 function App({ initialAnsi }: { initialAnsi: string | Buffer }) {
   const [ansi, setAnsi] = useState(initialAnsi)
   const [count, setCount] = useState(0)
+  const scrollBoxRef = useRef<ScrollBoxRenderable>(null)
+  const terminalBufferRef = useRef<TerminalBufferRenderable>(null)
 
   useKeyboard((key) => {
     if (key.name === "q" || key.name === "escape") {
@@ -33,14 +35,49 @@ function App({ initialAnsi }: { initialAnsi: string | Buffer }) {
       setAnsi(prefix + ansi)
       setCount(count + 1)
     }
+    if (key.name === "t") {
+      // Scroll to top
+      if (scrollBoxRef.current) {
+        scrollBoxRef.current.scrollTo(0)
+      }
+    }
+    if (key.name === "b") {
+      // Scroll to bottom
+      if (scrollBoxRef.current && terminalBufferRef.current) {
+        const lastLine = terminalBufferRef.current.lineCount - 1
+        const scrollPos = terminalBufferRef.current.getScrollPositionForLine(lastLine)
+        scrollBoxRef.current.scrollTo(scrollPos)
+      }
+    }
+    if (key.name === "1" || key.name === "2" || key.name === "3") {
+      // Scroll to specific lines in the output
+      if (scrollBoxRef.current && terminalBufferRef.current) {
+        const lineMap: Record<string, number> = {
+          "1": 10,  // Line 10
+          "2": 50,  // Line 50
+          "3": 100, // Line 100
+        }
+        const targetLine = lineMap[key.name]
+        const scrollPos = terminalBufferRef.current.getScrollPositionForLine(targetLine)
+        scrollBoxRef.current.scrollTo(scrollPos)
+      }
+    }
   })
 
   return (
     <box style={{ flexDirection: "column", flexGrow: 1 }}>
-      <box style={{ height: 1, paddingLeft: 1, marginBottom: 1 }}>
-        <text fg="#8b949e">Press 'p' to add prefix | Press 'q' to quit | Prefix count: {count}</text>
+      <box style={{ height: 2, paddingLeft: 1, marginBottom: 1, flexDirection: "column" }}>
+        <text fg="#8b949e">Press 'p' to add prefix | 't' top | 'b' bottom | '1' line 10 | '2' line 50 | '3' line 100</text>
+        <text fg="#8b949e">Press 'q' to quit | Prefix count: {count} | Lines: {terminalBufferRef.current?.lineCount ?? 0}</text>
       </box>
-      <TerminalView ansi={ansi} />
+      <scrollbox
+        ref={scrollBoxRef}
+        focused
+        padding={3}
+        style={{ flexGrow: 1 }}
+      >
+        <terminal-buffer ref={terminalBufferRef} ansi={ansi} cols={120} rows={120} />
+      </scrollbox>
     </box>
   )
 }
