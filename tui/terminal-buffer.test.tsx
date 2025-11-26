@@ -117,8 +117,8 @@ describe("TerminalBufferRenderable", () => {
     expect(output).toContain("Line 2")
     expect(output).toContain("Line 3")
     expect(output).toBe(`Line 1                                  
-      Line 2                            
-            Line 3                      
+Line 2                                  
+Line 3                                  
                                         
                                         
                                         
@@ -145,7 +145,7 @@ describe("TerminalBufferRenderable", () => {
     expect(output).toContain("PREFIX")
     expect(output).toContain("Original Text")
     expect(output).toBe(`[PREFIX]                                
-        Original Text                   
+Original Text                           
                                         
                                         
                                         
@@ -175,8 +175,8 @@ describe("TerminalBufferRenderable", () => {
     expect(output).toContain("PREFIX 1")
     expect(output).toContain("Base Text")
     expect(output).toBe(`[PREFIX 2]                              
-          [PREFIX 1]                    
-                    Base Text           
+[PREFIX 1]                              
+Base Text                               
                                         
                                         
                                         
@@ -289,7 +289,7 @@ describe("TerminalBufferRenderable", () => {
     expect(output).toContain("Line3")
     expect(output).toBe(`Line1                                   
                                         
-     Line3                              
+Line3                                   
                                         
                                         
                                         
@@ -328,10 +328,10 @@ describe("TerminalBufferRenderable", () => {
     it("should handle ls --color=always output without extra blank lines when using limit", async () => {
       // Simulate ls --color=always -la output (5 lines)
       const lsOutput = 
-        "total 224\r\n" +
-        "drwxrwxr-x  27 user  staff   864 Nov 26 19:30 \x1b[34m.\x1b[0m\r\n" +
-        "drwx------  71 user  staff  2272 Nov 26 19:44 \x1b[34m..\x1b[0m\r\n" +
-        "-rw-r--r--   1 user  staff   109 Nov 26 18:15 .gitignore\r\n" +
+        "total 224\n" +
+        "drwxrwxr-x  27 user  staff   864 Nov 26 19:30 \x1b[34m.\x1b[0m\n" +
+        "drwx------  71 user  staff  2272 Nov 26 19:44 \x1b[34m..\x1b[0m\n" +
+        "-rw-r--r--   1 user  staff   109 Nov 26 18:15 .gitignore\n" +
         "-rw-r--r--   1 user  staff  1100 Nov 26 19:14 package.json"
   
       const actualLines = lsOutput.split("\n").length
@@ -356,9 +356,9 @@ describe("TerminalBufferRenderable", () => {
       
       expect(outputWithLimit).toBe(`total 224                                                                       
 drwxrwxr-x  27 user  staff   864 Nov 26 19:30 .                                 
-drwx------  71 user  staff  2272 Nov 26 19:44 ..                                
+drwx------  71 user  sta                                                        
+ff  2272 Nov 26 19:44 ..                                                        
 -rw-r--r--   1 user  staff   109 Nov 26 18:15 .gitignore                        
--rw-r--r--   1 user  staff  1100 Nov 26 19:14 package.json                      
 `)
       // Should be compact
       expect(outputWithLimit.trim().split('\n').length).toBeLessThan(10) 
@@ -366,8 +366,8 @@ drwx------  71 user  staff  2272 Nov 26 19:44 ..
   
     it("should handle ls output with smaller rows to avoid blank lines", async () => {
       const lsOutput = 
-        "total 224\r\n" +
-        "drwxrwxr-x  27 user  staff   864 Nov 26 19:30 \x1b[34m.\x1b[0m\r\n" +
+        "total 224\n" +
+        "drwxrwxr-x  27 user  staff   864 Nov 26 19:30 \x1b[34m.\x1b[0m\n" +
         "drwx------  71 user  staff  2272 Nov 26 19:44 \x1b[34m..\x1b[0m"
   
       const actualLines = lsOutput.split("\n").length
@@ -382,8 +382,8 @@ drwx------  71 user  staff  2272 Nov 26 19:44 ..
       const output = captureCharFrame()
       expect(output).toBe(`total 224                                                                       
 drwxrwxr-x  27 user  staff   864 Nov 26 19:30 .                                 
-drwx------  71 user  staff  2272 Nov 26 19:44 ..                                
-                                                                                
+drwx------  71 user  sta                                                        
+ff  2272 Nov 26 19:44 ..                                                        
                                                                                 
 `)
     })

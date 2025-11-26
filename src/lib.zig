@@ -146,29 +146,36 @@ pub fn writeJsonOutput(
         try writer.writeByte('[');
 
         const cells = pin.cells(.all);
-        
-        // Find last non-null cell to avoid trailing spaces
-        var end_idx: usize = 0;
-        var i: usize = cells.len;
-        while (i > 0) {
-            i -= 1;
-            const cell = &cells[i];
-            if (cell.codepoint() != 0) {
-                end_idx = i + 1;
-                break;
-            }
-        }
-
+        var span_start: usize = 0;
         var span_len: usize = 0;
         var current_style: ?CellStyle = null;
         var text_len: usize = 0;
         var span_idx: usize = 0;
 
-        for (cells[0..end_idx]) |*cell| {
+        for (cells, 0..) |*cell, col_idx| {
             if (cell.wide == .spacer_tail) continue;
 
-            var cp = cell.codepoint();
-            if (cp == 0) cp = 32; // Convert NULL to space
+            const cp = cell.codepoint();
+            const is_null = cp == 0;
+
+            if (is_null) {
+                if (text_len > 0) {
+                    if (span_idx > 0) try writer.writeByte(',');
+                    try writer.writeByte('[');
+                    try writeJsonString(writer, text_buf[0..text_len]);
+                    try writer.writeByte(',');
+                    try writeColor(writer, current_style.?.fg);
+                    try writer.writeByte(',');
+                    try writeColor(writer, current_style.?.bg);
+                    try writer.print(",{},{}", .{ current_style.?.flags.toInt(), span_len });
+                    try writer.writeByte(']');
+                    span_idx += 1;
+                    text_len = 0;
+                    span_len = 0;
+                }
+                current_style = null;
+                continue;
+            }
 
             const style = getStyleFromCell(cell, pin, palette, terminal_bg);
             const style_changed = if (current_style) |cs| !cs.eql(style) else true;
@@ -189,8 +196,7 @@ pub fn writeJsonOutput(
             }
 
             if (style_changed) {
-                // span_start is unused but kept for structure if needed
-                // span_start = col_idx; // col_idx is not available in this loop form
+                span_start = col_idx;
                 current_style = style;
             }
 

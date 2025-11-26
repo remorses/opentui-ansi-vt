@@ -40,16 +40,16 @@ function getLibPath(): string {
   const libName = `libpty-to-json.${suffix}`
   const target = getPlatformTarget()
 
-  // Check local development path (zig-out) first!
-  const devPath = path.join(import.meta.dir, "..", "zig-out", "lib", libName)
-  if (fs.existsSync(devPath)) {
-    return devPath
-  }
-
-  // Check embedded libraries (for bun compile or dist)
+  // Check embedded libraries first (for bun compile)
   const embedded = getEmbeddedLib()
   if (embedded && fs.existsSync(embedded)) {
     return embedded
+  }
+
+  // Check local development path (zig-out)
+  const devPath = path.join(import.meta.dir, "..", "zig-out", "lib", libName)
+  if (fs.existsSync(devPath)) {
+    return devPath
   }
 
   // Check npm package dist paths
