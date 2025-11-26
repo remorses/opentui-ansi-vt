@@ -10,6 +10,7 @@
   - `applyHighlightsToLine` function to apply highlights to text chunks
   - `terminalDataToStyledText` now accepts optional `highlights` parameter
   - `TerminalBufferRenderable` now accepts `highlights` option in constructor and as a property
+- **tui demo**: Added `findWordHighlights` helper and demo highlighting for ERROR/WARN/SUCCESS words
 
 ## 1.2.2
 

@@ -1,10 +1,49 @@
 import { createCliRenderer, type ScrollBoxRenderable } from "@opentui/core"
 import { createRoot, useKeyboard, extend } from "@opentui/react"
-import { useState, useRef } from "react"
-import { TerminalBufferRenderable } from "./terminal-buffer"
+import { useState, useRef, useMemo } from "react"
+import { TerminalBufferRenderable, type HighlightRegion } from "./terminal-buffer"
+import { ptyToJson } from "./ffi"
 
 // Register the terminal-buffer component
 extend({ "terminal-buffer": TerminalBufferRenderable })
+
+/**
+ * Finds all occurrences of a word in the terminal output and returns highlight regions.
+ * Searches through the rendered terminal lines (after ANSI parsing).
+ */
+function findWordHighlights(
+  ansi: string | Buffer,
+  word: string,
+  backgroundColor: string,
+  cols = 120,
+  rows = 120,
+): HighlightRegion[] {
+  const data = ptyToJson(ansi, { cols, rows })
+  const highlights: HighlightRegion[] = []
+
+  for (let lineIdx = 0; lineIdx < data.lines.length; lineIdx++) {
+    const line = data.lines[lineIdx]
+    // Build the plain text for this line
+    const lineText = line.spans.map((s) => s.text).join("")
+    
+    // Find all occurrences of the word in this line
+    let pos = 0
+    while (true) {
+      const idx = lineText.indexOf(word, pos)
+      if (idx === -1) break
+      
+      highlights.push({
+        line: lineIdx,
+        start: idx,
+        end: idx + word.length,
+        backgroundColor,
+      })
+      pos = idx + 1
+    }
+  }
+
+  return highlights
+}
 
 export function TerminalView({ ansi }: { ansi: string | Buffer }) {
   return (
@@ -25,6 +64,15 @@ function App({ initialAnsi }: { initialAnsi: string | Buffer }) {
   const [count, setCount] = useState(0)
   const scrollBoxRef = useRef<ScrollBoxRenderable>(null)
   const terminalBufferRef = useRef<TerminalBufferRenderable>(null)
+
+  // Find and highlight specific words in the terminal output
+  const highlights = useMemo(() => {
+    return [
+      ...findWordHighlights(ansi, "ERROR", "#664400"),   // Dark yellow/orange for ERROR
+      ...findWordHighlights(ansi, "WARN", "#665500"),    // Slightly different yellow for WARN
+      ...findWordHighlights(ansi, "SUCCESS", "#006622"), // Dark green for SUCCESS
+    ]
+  }, [ansi])
 
   useKeyboard((key) => {
     if (key.name === "q" || key.name === "escape") {
@@ -66,9 +114,10 @@ function App({ initialAnsi }: { initialAnsi: string | Buffer }) {
 
   return (
     <box style={{ flexDirection: "column", flexGrow: 1 }}>
-      <box style={{ height: 2, paddingLeft: 1, marginBottom: 1, flexDirection: "column" }}>
+      <box style={{ height: 3, paddingLeft: 1, marginBottom: 1, flexDirection: "column" }}>
         <text fg="#8b949e">Press 'p' to add prefix | 't' top | 'b' bottom | '1' line 10 | '2' line 50 | '3' line 100</text>
         <text fg="#8b949e">Press 'q' to quit | Prefix count: {count} | Lines: {terminalBufferRef.current?.lineCount ?? 0}</text>
+        <text fg="#8b949e">Highlights: <span bg="#664400">ERROR</span> <span bg="#665500">WARN</span> <span bg="#006622">SUCCESS</span> ({highlights.length} found)</text>
       </box>
       <scrollbox
         ref={scrollBoxRef}
@@ -76,7 +125,7 @@ function App({ initialAnsi }: { initialAnsi: string | Buffer }) {
         padding={3}
         style={{ flexGrow: 1 }}
       >
-        <terminal-buffer ref={terminalBufferRef} ansi={ansi} cols={120} rows={120} />
+        <terminal-buffer ref={terminalBufferRef} ansi={ansi} cols={120} rows={120} highlights={highlights} />
       </scrollbox>
     </box>
   )
