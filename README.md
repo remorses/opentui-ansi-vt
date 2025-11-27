@@ -1,6 +1,6 @@
-# pty-to-json
+# opentui-ansi-vt
 
-Fast ANSI/VT terminal parser powered by [Ghostty's](https://github.com/ghostty-org/ghostty) Zig terminal emulation library. Converts raw PTY logs to JSON or renders them in a TUI viewer.
+Fast ANSI/VT terminal parser powered by [Ghostty's](https://github.com/ghostty-org/ghostty) Zig terminal emulation library. Converts raw PTY logs to JSON, strips ANSI for plain text, or renders them in a TUI viewer.
 
 ## Features
 
@@ -8,6 +8,7 @@ Fast ANSI/VT terminal parser powered by [Ghostty's](https://github.com/ghostty-o
 - **Full VT emulation** - ANSI colors (16/256/RGB), styles, cursor movements, scrolling
 - **TUI Viewer** - Interactive terminal viewer built with [opentui](https://github.com/sst/opentui)
 - **JSON output** - Compact format with merged spans for rendering
+- **Plain text output** - Strip ANSI codes for LLM/text processing
 - **Bun FFI** - Use the Zig library directly from TypeScript
 
 ## Installation
@@ -28,9 +29,9 @@ bun add @opentui/core @opentui/solid  # For Solid.js
 ### Basic FFI Usage
 
 ```typescript
-import { ptyToJson, type TerminalData } from "opentui-ansi-vt"
+import { ptyToJson, ptyToText, type TerminalData } from "opentui-ansi-vt"
 
-// Parse ANSI string or buffer
+// Parse ANSI string or buffer to JSON with styling info
 const data: TerminalData = ptyToJson("\x1b[32mHello\x1b[0m World", {
   cols: 120,
   rows: 40,
@@ -39,6 +40,35 @@ const data: TerminalData = ptyToJson("\x1b[32mHello\x1b[0m World", {
 console.log(data.lines) // Array of lines with styled spans
 console.log(data.cursor) // [col, row] cursor position
 ```
+
+### Strip ANSI for Plain Text
+
+Use `ptyToText` to strip all ANSI escape codes and get plain text output. This is useful for sending terminal output to LLMs or other text processors that don't handle ANSI codes.
+
+```typescript
+import { ptyToText } from "opentui-ansi-vt"
+
+// Strip ANSI codes - returns plain text
+const plain = ptyToText("\x1b[31mError:\x1b[0m Something went wrong")
+// Returns: "Error: Something went wrong"
+
+// Works with complex escape sequences too
+const complex = ptyToText("\x1b[1;38;2;255;100;50mBold RGB\x1b[0m text")
+// Returns: "Bold RGB text"
+
+// Optional cols/rows for terminal emulation accuracy
+const text = ptyToText(ansiBuffer, { cols: 120, rows: 40 })
+```
+
+**Why use `ptyToText` instead of regex?**
+
+Unlike simple regex-based ANSI strippers, `ptyToText` uses a full terminal emulator to process escape sequences. This correctly handles:
+
+- Cursor movements and positioning
+- Line wrapping at terminal width
+- Scrolling regions
+- All SGR (Select Graphic Rendition) sequences
+- OSC (Operating System Command) sequences
 
 ### With OpenTUI React
 
@@ -237,10 +267,13 @@ const styledText = terminalDataToStyledText(data, highlights)
 #### Main Export
 
 ```typescript
-import { ptyToJson, type TerminalData } from "opentui-ansi-vt"
+import { ptyToJson, ptyToText, type TerminalData } from "opentui-ansi-vt"
 
-// Parse ANSI data (if you need direct access to the data structure)
+// Parse ANSI data to JSON with full styling info
 const data = ptyToJson(input, options)
+
+// Strip ANSI codes and return plain text (for LLMs, logging, etc.)
+const plainText = ptyToText(input, options)
 ```
 
 #### Terminal Buffer Component
@@ -263,7 +296,8 @@ import type {
   TerminalData, 
   TerminalLine, 
   TerminalSpan, 
-  PtyToJsonOptions 
+  PtyToJsonOptions,
+  PtyToTextOptions
 } from "opentui-ansi-vt"
 
 import type { 
@@ -287,6 +321,11 @@ interface TerminalSpan {
   bg: string | null
   flags: number       // StyleFlags bitmask
   width: number
+}
+
+interface PtyToTextOptions {
+  cols?: number               // Terminal width (default: 120)
+  rows?: number               // Terminal height (default: 40)
 }
 
 interface TerminalBufferOptions {
