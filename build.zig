@@ -10,6 +10,8 @@ pub fn build(b: *std.Build) void {
         .root_source_file = b.path("src/lib.zig"),
         .target = target,
         .optimize = optimize,
+        .strip = true, // Strip debug symbols for smaller binaries
+        .single_threaded = true, // Remove threading overhead (not needed for PTY parsing)
     });
 
     if (b.lazyDependency("ghostty", .{

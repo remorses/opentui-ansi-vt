@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.5
+
+### Optimizations
+
+- **build**: Enable `strip` and `single_threaded` for smaller and faster binaries
+  - Strips debug symbols from release builds
+  - Removes threading overhead (not needed for PTY parsing)
+  - Results in significantly smaller `.so`/`.dylib` files
+
 ## 1.2.4
 
 ### Features
