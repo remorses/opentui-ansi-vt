@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.4
+
+### Features
+
+- **ffi**: Add `ptyToText` function to strip ANSI escape codes and return plain text
+  - Uses ghostty's terminal formatter with `.plain` format for accurate ANSI stripping
+  - Useful for cleaning terminal output before sending to LLMs or other text processors
+  - Handles all ANSI codes including colors, styles (bold/italic/underline), and RGB sequences
+  - Windows fallback uses `strip-ansi` package
+
+### Bug Fixes
+
+- **ffi**: Call `freeArena()` on error paths to prevent memory accumulation
+  - Both `ptyToJson` and `ptyToText` now properly free the arena when returning null
+
 ## 1.2.3
 
 ### Features

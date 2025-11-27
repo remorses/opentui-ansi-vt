@@ -2,6 +2,7 @@ const std = @import("std");
 const ghostty_vt = @import("ghostty-vt");
 const color = ghostty_vt.color;
 const pagepkg = ghostty_vt.page;
+const formatter = ghostty_vt.formatter;
 
 // Disable all logging from ghostty-vt library
 pub const std_options: std.Options = .{
@@ -277,6 +278,36 @@ export fn ptyToJson(
     return output.items.ptr;
 }
 
+export fn ptyToText(
+    input_ptr: [*]const u8,
+    input_len: usize,
+    cols: u16,
+    rows: u16,
+    out_len: *usize,
+) ?[*]u8 {
+    const input = input_ptr[0..input_len];
+
+    var t: ghostty_vt.Terminal = ghostty_vt.Terminal.init(globalArena, .{ .cols = cols, .rows = rows }) catch return null;
+    defer t.deinit(globalArena);
+
+    // Enable linefeed mode so LF (\n) also performs carriage return (moves to column 0)
+    t.modes.set(.linefeed, true);
+
+    var stream = t.vtStream();
+    defer stream.deinit();
+
+    stream.nextSlice(input) catch return null;
+
+    // Use the ghostty formatter with plain format to get just the text
+    var builder: std.Io.Writer.Allocating = .init(globalArena);
+    var fmt: formatter.TerminalFormatter = formatter.TerminalFormatter.init(&t, .plain);
+    fmt.format(&builder.writer) catch return null;
+
+    const output = builder.writer.buffered();
+    out_len.* = output.len;
+    return @constCast(output.ptr);
+}
+
 export fn freeArena() void {
     _ = arena.reset(.free_all);
 }
@@ -303,4 +334,53 @@ test "basic JSON output" {
     try testing.expect(std.mem.indexOf(u8, json, "\"cols\":80") != null);
     try testing.expect(std.mem.indexOf(u8, json, "\"totalLines\":") != null);
     try testing.expect(std.mem.indexOf(u8, json, "\"Hello\"") != null);
+}
+
+test "ptyToText strips ANSI and returns plain text" {
+    const alloc = testing.allocator;
+
+    var t: ghostty_vt.Terminal = try .init(alloc, .{ .cols = 80, .rows = 24 });
+    defer t.deinit(alloc);
+
+    // Enable linefeed mode to match ptyToText behavior
+    t.modes.set(.linefeed, true);
+
+    var stream = t.vtStream();
+    defer stream.deinit();
+
+    // Input with ANSI color codes: red "Hello" and green "World"
+    try stream.nextSlice("\x1b[31mHello\x1b[0m \x1b[32mWorld\x1b[0m");
+
+    var builder: std.Io.Writer.Allocating = .init(alloc);
+    defer builder.deinit();
+
+    var fmt: formatter.TerminalFormatter = formatter.TerminalFormatter.init(&t, .plain);
+    try fmt.format(&builder.writer);
+
+    const output = builder.writer.buffered();
+    try testing.expectEqualStrings("Hello World", output);
+}
+
+test "ptyToText handles multiline with ANSI" {
+    const alloc = testing.allocator;
+
+    var t: ghostty_vt.Terminal = try .init(alloc, .{ .cols = 80, .rows = 24 });
+    defer t.deinit(alloc);
+
+    t.modes.set(.linefeed, true);
+
+    var stream = t.vtStream();
+    defer stream.deinit();
+
+    // Input with ANSI codes across multiple lines
+    try stream.nextSlice("\x1b[1mBold\x1b[0m\n\x1b[4mUnderline\x1b[0m");
+
+    var builder: std.Io.Writer.Allocating = .init(alloc);
+    defer builder.deinit();
+
+    var fmt: formatter.TerminalFormatter = formatter.TerminalFormatter.init(&t, .plain);
+    try fmt.format(&builder.writer);
+
+    const output = builder.writer.buffered();
+    try testing.expectEqualStrings("Bold\nUnderline", output);
 }

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 import { rgbToHex } from "@opentui/core"
-import { ptyToJson, StyleFlags, type TerminalData, type TerminalSpan } from "./ffi"
+import { ptyToJson, ptyToText, StyleFlags, type TerminalData, type TerminalSpan } from "./ffi"
 import { terminalDataToStyledText, type HighlightRegion } from "./terminal-buffer"
 
 describe("ptyToJson", () => {
@@ -141,6 +141,49 @@ describe("terminalDataToStyledText highlights", () => {
       (c) => c.text === "string" && c.bg && rgbToHex(c.bg) === "#00ff00"
     )
     expect(highlightedChunk).toBeDefined()
+  })
+})
+
+describe("ptyToText", () => {
+  it("should strip ANSI codes and return plain text", () => {
+    const input = "\x1b[31mred\x1b[0m \x1b[32mgreen\x1b[0m"
+    const result = ptyToText(input, { cols: 80, rows: 24 })
+    expect(result).toBe("red green")
+  })
+
+  it("should handle bold and italic ANSI codes", () => {
+    const input = "\x1b[1mBold\x1b[0m \x1b[3mItalic\x1b[0m"
+    const result = ptyToText(input, { cols: 80, rows: 24 })
+    expect(result).toBe("Bold Italic")
+  })
+
+  it("should handle multiline input", () => {
+    const input = "\x1b[31mLine 1\x1b[0m\n\x1b[32mLine 2\x1b[0m"
+    const result = ptyToText(input, { cols: 80, rows: 24 })
+    expect(result).toBe("Line 1\nLine 2")
+  })
+
+  it("should handle RGB color codes", () => {
+    const input = "\x1b[38;2;255;0;128mRGB text\x1b[0m"
+    const result = ptyToText(input, { cols: 80, rows: 24 })
+    expect(result).toBe("RGB text")
+  })
+
+  it("should handle plain text without ANSI codes", () => {
+    const input = "Plain text without any ANSI codes"
+    const result = ptyToText(input, { cols: 80, rows: 24 })
+    expect(result).toBe("Plain text without any ANSI codes")
+  })
+
+  it("should handle empty input", () => {
+    const result = ptyToText("", { cols: 80, rows: 24 })
+    expect(result).toBe("")
+  })
+
+  it("should handle complex nested ANSI codes", () => {
+    const input = "\x1b[1;31;4mBold Red Underline\x1b[0m normal \x1b[32;3mGreen Italic\x1b[0m"
+    const result = ptyToText(input, { cols: 80, rows: 24 })
+    expect(result).toBe("Bold Red Underline normal Green Italic")
   })
 })
 

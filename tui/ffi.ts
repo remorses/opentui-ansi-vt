@@ -43,16 +43,16 @@ function getLibPath(): string {
   const libName = `libpty-to-json.${suffix}`
   const target = getPlatformTarget()
 
-  // Check embedded libraries first (for bun compile)
-  const embedded = getEmbeddedLib()
-  if (embedded && fs.existsSync(embedded)) {
-    return embedded
-  }
-
-  // Check local development path (zig-out)
+  // Check local development path (zig-out) first for development
   const devPath = path.join(import.meta.dir, "..", "zig-out", "lib", libName)
   if (fs.existsSync(devPath)) {
     return devPath
+  }
+
+  // Check embedded libraries (for bun compile)
+  const embedded = getEmbeddedLib()
+  if (embedded && fs.existsSync(embedded)) {
+    return embedded
   }
 
   // Check npm package dist paths
@@ -74,6 +74,10 @@ const lib = IS_WINDOWS
   : dlopen(getLibPath(), {
       ptyToJson: {
         args: [FFIType.ptr, FFIType.u64, FFIType.u16, FFIType.u16, FFIType.u64, FFIType.u64, FFIType.ptr],
+        returns: FFIType.ptr,
+      },
+      ptyToText: {
+        args: [FFIType.ptr, FFIType.u64, FFIType.u16, FFIType.u16, FFIType.ptr],
         returns: FFIType.ptr,
       },
       freeArena: {
@@ -158,6 +162,7 @@ export function ptyToJson(input: Buffer | Uint8Array | string, options: PtyToJso
   const resultPtr = lib.symbols.ptyToJson(inputPtr, inputArray.length, cols, rows, offset, limit, outLenPtr)
 
   if (!resultPtr) {
+    lib.symbols.freeArena()
     throw new Error("ptyToJson returned null")
   }
 
@@ -192,6 +197,70 @@ export function ptyToJson(input: Buffer | Uint8Array | string, options: PtyToJso
       })),
     })),
   }
+}
+
+export interface PtyToTextOptions {
+  cols?: number
+  rows?: number
+}
+
+/**
+ * Windows fallback: strips ANSI codes and returns plain text
+ */
+function ptyToTextFallback(input: Buffer | Uint8Array | string, options: PtyToTextOptions = {}): string {
+  const text = typeof input === "string" ? input : input.toString("utf-8")
+  return stripAnsi(text)
+}
+
+/**
+ * Strips ANSI escape codes from input and returns plain text.
+ * Uses the terminal emulator to properly process escape sequences,
+ * then outputs only the visible text content.
+ * 
+ * Useful for cleaning terminal output before sending to LLMs or other text processors.
+ */
+export function ptyToText(input: Buffer | Uint8Array | string, options: PtyToTextOptions = {}): string {
+  // Windows fallback: strip ANSI and return plain text
+  if (IS_WINDOWS || !lib) {
+    return ptyToTextFallback(input, options)
+  }
+
+  const { cols = 120, rows = 40 } = options
+
+  const inputBuffer = typeof input === "string" ? Buffer.from(input) : input
+  const inputArray = inputBuffer instanceof Buffer ? new Uint8Array(inputBuffer) : inputBuffer
+
+  // Handle empty input
+  if (inputArray.length === 0) {
+    return ""
+  }
+
+  const inputPtr = ptr(inputArray)
+
+  const outLenBuffer = new BigUint64Array(1)
+  const outLenPtr = ptr(outLenBuffer)
+
+  const resultPtr = lib.symbols.ptyToText(inputPtr, inputArray.length, cols, rows, outLenPtr)
+
+  if (!resultPtr) {
+    lib.symbols.freeArena()
+    throw new Error("ptyToText returned null")
+  }
+
+  const outLen = Number(outLenBuffer[0])
+  
+  // Handle empty output
+  if (outLen === 0) {
+    lib.symbols.freeArena()
+    return ""
+  }
+
+  const textBuffer = toArrayBuffer(resultPtr, 0, outLen)
+  const text = new TextDecoder().decode(textBuffer)
+
+  lib.symbols.freeArena()
+
+  return text
 }
 
 export const StyleFlags = {
