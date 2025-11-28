@@ -1,11 +1,5 @@
 # Changelog
 
-## 1.2.11
-
-### Bug Fixes
-
-- **dist**: Rebuild all platform binaries via CI with correct symbols
-
 ## 1.2.10
 
 ### Bug Fixes
