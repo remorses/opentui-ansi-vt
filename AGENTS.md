@@ -90,7 +90,7 @@ after any meaningful change update CHANGELOG.md with the version number and the 
 
 in bullet points use nested list and specify for which command exactly are the changes. or group them to make it clear what they cover.
 
-before updating the changelog bump the package.json version field first. NEVER do major bumps. NEVER publish yourself
+before updating the changelog bump the package.json version field first. NEVER do major bumps
 
 NEVER update existing changelog bullet points for previous version unless you added those bullet points yourself recently and the change is of the same version as it is now.
 
@@ -101,6 +101,15 @@ NEVER update existing changelog bullet points for previous version unless you ad
 
 - do not consider local state truthful when interacting with server. when interacting with the server with rpc or api calls never use state from the render function as input for the api call. this state can easily become stale or not get updated in the closure context. instead prefer using zustand `useStore.getState().stateValue`. notice that useLoaderData or useParams should be fine in this case.
 
-## changelog
+## Publishing
 
-when you make a change update or create the CHANGELOG.md file and bump the package.json version. on push ci will publish the package.
+NEVER run `npm publish` locally. CI handles publishing automatically on push to main. Local publishing causes issues because:
+- The `dist/` folder may have outdated or missing binaries for other platforms
+- CI builds fresh binaries for all platforms (darwin-arm64, darwin-x64, linux-arm64, linux-x64)
+- Publishing locally with stale binaries breaks the package for users
+
+When you make a change:
+1. Bump the package.json version
+2. Update CHANGELOG.md
+3. Commit and push to main
+4. CI will build and publish automatically
