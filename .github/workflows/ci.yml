@@ -135,17 +135,6 @@ jobs:
       - name: Install dependencies
         run: bun install
 
-      - name: Auto-bump version if exists
-        run: |
-          PACKAGE_NAME=$(node -p "require('./package.json').name")
-          NPM_VERSION=$(npm view "$PACKAGE_NAME" version 2>/dev/null || echo "")
-          if [ -n "$NPM_VERSION" ]; then
-            # Set version to NPM version first, then bump
-            npm version "$NPM_VERSION" --no-git-tag-version --allow-same-version
-            npm version patch --no-git-tag-version
-          fi
-          echo "Publishing version: $(node -p "require('./package.json').version")"
-
       - name: Publish to npm
         run: npm publish --access public
         env:

@@ -80,6 +80,10 @@ const lib = IS_WINDOWS
         args: [FFIType.ptr, FFIType.u64, FFIType.u16, FFIType.u16, FFIType.ptr],
         returns: FFIType.ptr,
       },
+      ptyToHtml: {
+        args: [FFIType.ptr, FFIType.u64, FFIType.u16, FFIType.u16, FFIType.ptr],
+        returns: FFIType.ptr,
+      },
       freeArena: {
         args: [],
         returns: FFIType.void,
@@ -263,6 +267,79 @@ export function ptyToText(input: Buffer | Uint8Array | string, options: PtyToTex
   lib.symbols.freeArena()
 
   return text
+}
+
+export interface PtyToHtmlOptions {
+  cols?: number
+  rows?: number
+}
+
+/**
+ * Windows fallback: wraps plain text in pre tags
+ */
+function ptyToHtmlFallback(input: Buffer | Uint8Array | string, options: PtyToHtmlOptions = {}): string {
+  const text = typeof input === "string" ? input : input.toString("utf-8")
+  const plainText = stripAnsi(text)
+  // Escape HTML entities
+  const escaped = plainText
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+  return `<pre style="font-family: monospace;">${escaped}</pre>`
+}
+
+/**
+ * Converts terminal output with ANSI escape codes to styled HTML.
+ * Uses the terminal emulator to properly process escape sequences,
+ * then outputs HTML with inline styles for colors and text attributes.
+ *
+ * Useful for rendering terminal output in web pages or HTML documents.
+ */
+export function ptyToHtml(input: Buffer | Uint8Array | string, options: PtyToHtmlOptions = {}): string {
+  // Windows fallback
+  if (IS_WINDOWS || !lib) {
+    return ptyToHtmlFallback(input, options)
+  }
+
+  // Large rows = less scrolling = fewer pages = cheaper
+  // cols affects line wrapping (high default to avoid unwanted wraps)
+  const { cols = 500, rows = 256 } = options
+
+  const inputBuffer = typeof input === "string" ? Buffer.from(input) : input
+  const inputArray = inputBuffer instanceof Buffer ? new Uint8Array(inputBuffer) : inputBuffer
+
+  // Handle empty input
+  if (inputArray.length === 0) {
+    return ""
+  }
+
+  const inputPtr = ptr(inputArray)
+
+  const outLenBuffer = new BigUint64Array(1)
+  const outLenPtr = ptr(outLenBuffer)
+
+  const resultPtr = lib.symbols.ptyToHtml(inputPtr, inputArray.length, cols, rows, outLenPtr)
+
+  if (!resultPtr) {
+    lib.symbols.freeArena()
+    throw new Error("ptyToHtml returned null")
+  }
+
+  const outLen = Number(outLenBuffer[0])
+
+  // Handle empty output
+  if (outLen === 0) {
+    lib.symbols.freeArena()
+    return ""
+  }
+
+  const htmlBuffer = toArrayBuffer(resultPtr, 0, outLen)
+  const html = new TextDecoder().decode(htmlBuffer)
+
+  lib.symbols.freeArena()
+
+  return html
 }
 
 export const StyleFlags = {

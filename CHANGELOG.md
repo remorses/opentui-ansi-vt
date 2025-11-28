@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.2.6
+
+### Features
+
+- **ffi**: Add `ptyToHtml` function to convert ANSI terminal output to styled HTML
+  - Uses ghostty's terminal formatter with `.html` format for accurate rendering
+  - Outputs HTML with inline styles for colors and text attributes (bold, italic, underline, etc.)
+  - Useful for rendering terminal output in web pages or HTML documents
+  - Windows fallback escapes HTML entities and wraps in `<pre>` tags
+
 ## 1.2.5
 
 ### Optimizations
