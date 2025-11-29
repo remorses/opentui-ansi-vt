@@ -1,5 +1,13 @@
 # Changelog
 
+## 1.2.12
+
+### Features
+
+- **terminal-buffer**: Add `trimEnd` boolean prop to remove trailing empty lines
+  - When `trimEnd` is true, empty lines at the end of the output are removed
+  - Useful for compact rendering when terminal rows exceed actual content
+
 ## 1.2.10
 
 ### Bug Fixes

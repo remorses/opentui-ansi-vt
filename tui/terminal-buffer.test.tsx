@@ -324,6 +324,60 @@ Line3
 `)
   })
 
+  describe("trimEnd", () => {
+    it("should keep trailing empty lines without trimEnd", async () => {
+      const ansi = "Line 1\nLine 2"
+      
+      const { renderOnce, captureCharFrame } = await testRender(
+        <box border>
+          <terminal-buffer ansi={ansi} cols={20} rows={5} />
+        </box>,
+        { width: 24, height: 10 }
+      )
+      await renderOnce()
+
+      expect(captureCharFrame()).toMatchInlineSnapshot(`
+"┌──────────────────────┐
+│Line 1                │
+│Line 2                │
+│                      │
+│                      │
+│                      │
+└──────────────────────┘
+                        
+                        
+                        
+"
+`)
+    })
+
+    it("should remove trailing empty lines when trimEnd is true", async () => {
+      const ansi = "Line 1\nLine 2"
+      
+      const { renderOnce, captureCharFrame } = await testRender(
+        <box border>
+          <terminal-buffer ansi={ansi} cols={20} rows={5} trimEnd />
+        </box>,
+        { width: 24, height: 10 }
+      )
+      await renderOnce()
+
+      expect(captureCharFrame()).toMatchInlineSnapshot(`
+"┌──────────────────────┐
+│Line 1                │
+│Line 2                │
+└──────────────────────┘
+                        
+                        
+                        
+                        
+                        
+                        
+"
+`)
+    })
+  })
+
   describe("ls output tests", () => {
     it("should handle ls --color=always output without extra blank lines when using limit", async () => {
       // Simulate ls --color=always -la output (5 lines)

@@ -192,6 +192,7 @@ export interface TerminalBufferOptions extends TextBufferOptions {
   cols?: number
   rows?: number
   limit?: number  // Maximum number of lines to render (from start)
+  trimEnd?: boolean  // Remove empty lines from the end
   highlights?: HighlightRegion[]  // Regions to highlight with custom background colors
 }
 
@@ -200,6 +201,7 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
   private _cols: number
   private _rows: number
   private _limit?: number
+  private _trimEnd?: boolean
   private _highlights?: HighlightRegion[]
   private _ansiDirty: boolean = false
   private _lineCount: number = 0
@@ -215,6 +217,7 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
     this._cols = options.cols ?? 120
     this._rows = options.rows ?? 40
     this._limit = options.limit
+    this._trimEnd = options.trimEnd
     this._highlights = options.highlights
     this._ansiDirty = true
   }
@@ -233,6 +236,18 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
   set limit(value: number | undefined) {
     if (this._limit !== value) {
       this._limit = value
+      this._ansiDirty = true
+      this.requestRender()
+    }
+  }
+
+  get trimEnd(): boolean | undefined {
+    return this._trimEnd
+  }
+
+  set trimEnd(value: boolean | undefined) {
+    if (this._trimEnd !== value) {
+      this._trimEnd = value
       this._ansiDirty = true
       this.requestRender()
     }
@@ -292,6 +307,17 @@ export class TerminalBufferRenderable extends TextBufferRenderable {
         rows: this._rows,
         limit: this._limit 
       })
+      
+      // Apply trimEnd: remove empty lines from the end
+      if (this._trimEnd) {
+        while (data.lines.length > 0) {
+          const lastLine = data.lines[data.lines.length - 1]
+          const hasText = lastLine.spans.some(span => span.text.trim().length > 0)
+          if (hasText) break
+          data.lines.pop()
+        }
+      }
+      
       const styledText = terminalDataToStyledText(data, this._highlights)
       this.textBuffer.setStyledText(styledText)
       this.updateTextInfo()
